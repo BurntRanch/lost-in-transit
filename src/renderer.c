@@ -1,5 +1,3 @@
-#include <SDL3/SDL_hints.h>
-#include <SDL3/SDL_stdinc.h>
 #define TITLE "Lost In Transit"
 
 #include "renderer.h"
@@ -14,6 +12,9 @@
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_surface.h>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_stdinc.h>
+
 #include <bits/time.h>
 #include <stdio.h>
 #include <time.h>
@@ -35,8 +36,6 @@ void LEDestroyWindow(void) {
 }
 
 bool LEInitWindow(void) {
-    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
-
     window = SDL_CreateWindow(TITLE, 800, 600, SDL_WINDOW_VULKAN);
     if (!window) {
         fprintf(stderr, "Something went wrong while creating a window! (SDL Error Code: %s)\n", SDL_GetError());
