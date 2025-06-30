@@ -14,15 +14,20 @@
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include <bits/time.h>
 #include <stdio.h>
 #include <time.h>
 
+TTF_Font *pLEGameFont = NULL;
+
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 
 static SDL_Surface *surface = NULL;
+
+static TTF_TextEngine *text_engine = NULL;
 
 void LEDestroyWindow(void) {
     if (window) {
@@ -57,6 +62,22 @@ bool LEInitWindow(void) {
     return true;
 }
 
+bool LEInitTTF(void) {
+    if (!TTF_Init()) {
+        fprintf(stderr, "Something went wrong while initializing SDL3_TTF! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    text_engine = TTF_CreateRendererTextEngine(renderer);
+
+    if (!text_engine) {
+        fprintf(stderr, "Couldn't create Renderer Text Engine! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    return true;
+}
+
 static struct timespec last_frame_time;
 static struct timespec now;
 
@@ -67,9 +88,6 @@ bool LEStepRender(double *frametime) {
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_KEY_DOWN) {
             if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-                LEDestroyWindow();
-                SDL_Quit();
-
                 return false;
             }
         }
@@ -86,12 +104,41 @@ bool LEStepRender(double *frametime) {
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
     if (!SDL_RenderFillRect(renderer, &rect)) {
         fprintf(stderr, "Something went wrong while rendering a rect! (SDL Error Code: %s)\n", SDL_GetError());
-        LEDestroyWindow();
 
         return false;
     }
 
+    SDL_Surface *text_surface = NULL;
+    SDL_Texture *text_texture = NULL;
+    struct SDL_FRect dst_rect;
+    
+    if (pLEGameFont) {
+        if (!(text_surface = TTF_RenderText_Shaded(pLEGameFont, "Hello, world!!!", 0, (SDL_Color){ 255, 255, 255, SDL_ALPHA_OPAQUE }, (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT }))) {
+            fprintf(stderr, "Something went wrong while rendering text! (SDL Error Code: %s)\n", SDL_GetError());
+
+            return false;
+        }
+
+        if (!(text_texture = SDL_CreateTextureFromSurface(renderer, text_surface))) {
+            fprintf(stderr, "Something went wrong while creating text texture! (SDL Error Code: %s)\n", SDL_GetError());
+
+            return false;
+        }
+
+        dst_rect.x = 0;
+        dst_rect.y = 0;
+        dst_rect.w = text_texture->w;
+        dst_rect.h = text_texture->h;
+
+        SDL_RenderTexture(renderer, text_texture, NULL, &dst_rect);
+    }
+
     SDL_RenderPresent(renderer);
+
+    if (pLEGameFont) {
+        SDL_DestroyTexture(text_texture);
+        SDL_DestroySurface(text_surface);
+    }
     
     if (frametime) {
         /* Frametime in milliseconds! */

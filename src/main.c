@@ -1,7 +1,9 @@
 #include "renderer.h"
 
+#include <SDL3/SDL_error.h>
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_init.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -34,14 +36,27 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (!LEInitWindow()) {
+    if (!LEInitWindow() || !LEInitTTF()) {
+        return 1;
+    }
+
+    pLEGameFont = TTF_OpenFont("AdwaitaMono-Regular.ttf", 24);
+    if (!pLEGameFont) {
+        printf("Failed to load game font! (SDL Error Code: %s)\n", SDL_GetError());
         return 1;
     }
 
     double frametime;
     while (LEStepRender(&frametime)) {
-        fprintf(stdout, "frametime: %fms (%ld FPS)\n", frametime, SDL_lround(1 / (frametime / 1000)));
+        printf("frametime: %fms (%ld FPS)\n", frametime, SDL_lround(1 / (frametime / 1000)));
     }
+
+    TTF_CloseFont(pLEGameFont);
+    pLEGameFont = NULL;
+    
+    LEDestroyWindow();
+    TTF_Quit();
+    SDL_Quit();
 
     return 0;
 }

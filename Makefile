@@ -24,7 +24,7 @@ VERSION    	 = 1.0.0
 SRC_CC  	 = $(wildcard src/*.c)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ		 = $(OBJ_CC)
-LDFLAGS   	+= -lSDL3
+LDFLAGS   	+= -lSDL3 -lSDL3_ttf
 CFLAGS  	?= -mtune=generic -march=native
 CFLAGS        += -fvisibility=hidden -Iinclude $(VARS) -DVERSION=\"$(VERSION)\"
 
