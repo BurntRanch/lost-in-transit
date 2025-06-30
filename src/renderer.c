@@ -1,3 +1,5 @@
+#include "main_menu.h"
+#include "scenes.h"
 #define TITLE "Lost In Transit"
 
 #include "renderer.h"
@@ -41,20 +43,17 @@ void LEDestroyWindow(void) {
 }
 
 bool LEInitWindow(void) {
-    window = SDL_CreateWindow(TITLE, 800, 600, SDL_WINDOW_VULKAN);
-    if (!window) {
+    if (!(window = SDL_CreateWindow(TITLE, 800, 600, SDL_WINDOW_VULKAN))) {
         fprintf(stderr, "Something went wrong while creating a window! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
 
-    surface = SDL_GetWindowSurface(window);
-    if (!surface) {
+    if (!(surface = SDL_GetWindowSurface(window))) {
         fprintf(stderr, "Something went wrong while getting a surface! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
     
-    renderer = SDL_GetRenderer(window);
-    if (!renderer) {
+    if (!(renderer = SDL_GetRenderer(window))) {
         fprintf(stderr, "Something went wrong while getting a window! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
@@ -68,14 +67,47 @@ bool LEInitTTF(void) {
         return false;
     }
 
-    text_engine = TTF_CreateRendererTextEngine(renderer);
-
-    if (!text_engine) {
+    if (!(text_engine = TTF_CreateRendererTextEngine(renderer))) {
         fprintf(stderr, "Couldn't create Renderer Text Engine! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
 
     return true;
+}
+
+/* What's the currently loaded scene? Refer to scenes.h for values */
+static Uint8 scene_loaded = SCENE_NONE;
+
+bool LELoadScene(const Uint8 scene) {
+    if (!text_engine) {
+        fprintf(stderr, "Can't load scene when TTF is not initialized!");
+        return false;
+    }
+
+    LECleanupScene();
+
+    switch (scene) {
+    case SCENE_MAINMENU:
+        if (!MainMenuInit(text_engine)) {
+            return false;
+        }
+    case SCENE_NONE:
+    default:
+        ;
+    }
+
+    scene_loaded = scene;
+    return true;
+}
+
+void LECleanupScene() {
+    switch (scene_loaded) {
+    case SCENE_MAINMENU:
+        MainMenuCleanup();
+    case SCENE_NONE:
+    default:
+        ;
+    }
 }
 
 static struct timespec last_frame_time;
@@ -107,38 +139,18 @@ bool LEStepRender(double *frametime) {
 
         return false;
     }
-
-    SDL_Surface *text_surface = NULL;
-    SDL_Texture *text_texture = NULL;
-    struct SDL_FRect dst_rect;
     
-    if (pLEGameFont) {
-        if (!(text_surface = TTF_RenderText_Shaded(pLEGameFont, "Hello, world!!!", 0, (SDL_Color){ 255, 255, 255, SDL_ALPHA_OPAQUE }, (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT }))) {
-            fprintf(stderr, "Something went wrong while rendering text! (SDL Error Code: %s)\n", SDL_GetError());
-
+    switch (scene_loaded) {
+    case SCENE_MAINMENU:
+        if (!MainMenuRender()) {
             return false;
         }
-
-        if (!(text_texture = SDL_CreateTextureFromSurface(renderer, text_surface))) {
-            fprintf(stderr, "Something went wrong while creating text texture! (SDL Error Code: %s)\n", SDL_GetError());
-
-            return false;
-        }
-
-        dst_rect.x = 0;
-        dst_rect.y = 0;
-        dst_rect.w = text_texture->w;
-        dst_rect.h = text_texture->h;
-
-        SDL_RenderTexture(renderer, text_texture, NULL, &dst_rect);
+    case SCENE_NONE:
+    default:
+        ;
     }
 
     SDL_RenderPresent(renderer);
-
-    if (pLEGameFont) {
-        SDL_DestroyTexture(text_texture);
-        SDL_DestroySurface(text_surface);
-    }
     
     if (frametime) {
         /* Frametime in milliseconds! */
