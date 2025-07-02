@@ -7,12 +7,12 @@
 /* Initialize elements such as text, etc.
  * Returns true on success.
  */
-bool MainMenuInit(TTF_TextEngine *pTextEngine);
+bool MainMenuInit(SDL_Renderer *pRenderer);
 
 /* Render the main menu.
  * Returns true if all went well.
  */
-bool MainMenuRender(void);
+bool MainMenuRender(const double * const delta);
 
 /* Clean everything up. */
 void MainMenuCleanup(void);

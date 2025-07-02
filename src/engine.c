@@ -1,8 +1,8 @@
-#include "main_menu.h"
-#include "scenes.h"
 #define TITLE "Lost In Transit"
 
-#include "renderer.h"
+#include "engine.h"
+#include "main_menu.h"
+#include "scenes.h"
 
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL.h>
@@ -18,7 +18,6 @@
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-#include <bits/time.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -28,8 +27,6 @@ static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 
 static SDL_Surface *surface = NULL;
-
-static TTF_TextEngine *text_engine = NULL;
 
 void LEDestroyWindow(void) {
     if (window) {
@@ -67,8 +64,30 @@ bool LEInitTTF(void) {
         return false;
     }
 
-    if (!(text_engine = TTF_CreateRendererTextEngine(renderer))) {
-        fprintf(stderr, "Couldn't create Renderer Text Engine! (SDL Error Code: %s)\n", SDL_GetError());
+    return true;
+}
+
+void DestroyText(struct LE_Text * const pLEText) {
+    if (pLEText->texture) {
+        SDL_DestroyTexture(pLEText->texture);
+        pLEText->texture = NULL;
+    }
+
+    if (pLEText->surface) {
+        SDL_DestroySurface(pLEText->surface);
+        pLEText->surface = NULL;
+    }
+}
+
+bool UpdateText(struct LE_Text * const pLEText) {
+    DestroyText(pLEText);
+
+    if (!(pLEText->surface = TTF_RenderText_Shaded_Wrapped(pLEGameFont, pLEText->text, 0, pLEText->fg, pLEText->bg, 0))) {
+        fprintf(stderr, "Failed to render text! (text: %s) (SDL Error Code: %s)\n", pLEText->text, SDL_GetError());
+        return false;
+    }
+    if (!(pLEText->texture = SDL_CreateTextureFromSurface(renderer, pLEText->surface))) {
+        fprintf(stderr, "Failed to create texture from text surface! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
 
@@ -79,7 +98,7 @@ bool LEInitTTF(void) {
 static Uint8 scene_loaded = SCENE_NONE;
 
 bool LELoadScene(const Uint8 scene) {
-    if (!text_engine) {
+    if (!TTF_WasInit()) {
         fprintf(stderr, "Can't load scene when TTF is not initialized!");
         return false;
     }
@@ -88,7 +107,7 @@ bool LELoadScene(const Uint8 scene) {
 
     switch (scene) {
     case SCENE_MAINMENU:
-        if (!MainMenuInit(text_engine)) {
+        if (!MainMenuInit(renderer)) {
             return false;
         }
     case SCENE_NONE:
@@ -112,37 +131,25 @@ void LECleanupScene() {
 
 static struct timespec last_frame_time;
 static struct timespec now;
+static double frametime;
 
-bool LEStepRender(double *frametime) {
+bool LEStepRender(double *pFrametime) {
     clock_gettime(CLOCK_MONOTONIC, &now);
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_EVENT_KEY_DOWN) {
-            if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-                return false;
-            }
+        /* If escape is held down OR a window close is requested, return false. */
+        if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+            return false;
         }
     }
 
-    SDL_ClearSurface(surface, 0, 0, 0, 0);
-
-    SDL_FRect rect;
-    rect.x = 200;
-    rect.y = 150;
-    rect.w = 400;
-    rect.h = 450;
-
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
-    if (!SDL_RenderFillRect(renderer, &rect)) {
-        fprintf(stderr, "Something went wrong while rendering a rect! (SDL Error Code: %s)\n", SDL_GetError());
-
-        return false;
-    }
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderClear(renderer);
     
     switch (scene_loaded) {
     case SCENE_MAINMENU:
-        if (!MainMenuRender()) {
+        if (!MainMenuRender(&frametime)) {
             return false;
         }
     case SCENE_NONE:
@@ -152,9 +159,10 @@ bool LEStepRender(double *frametime) {
 
     SDL_RenderPresent(renderer);
     
-    if (frametime) {
-        /* Frametime in milliseconds! */
-        *frametime = difftime(now.tv_nsec, last_frame_time.tv_nsec) / 1000000;
+    /* this sometimes dips in the negatives, WHY? */
+    frametime = difftime(now.tv_nsec, last_frame_time.tv_nsec) / 1000000000;
+    if (pFrametime) {
+        *pFrametime = frametime;
     }
 
     last_frame_time = now;
