@@ -1,3 +1,4 @@
+#include <SDL3/SDL_timer.h>
 #define TITLE "Lost In Transit"
 
 #include "engine.h"
@@ -21,7 +22,9 @@
 #include <stdio.h>
 #include <time.h>
 
-TTF_Font *pLEGameFont = NULL;
+TTF_Font *LEGameFont = NULL;
+
+int LEScreenWidth, LEScreenHeight;
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
@@ -55,6 +58,11 @@ bool LEInitWindow(void) {
         return false;
     }
 
+    if (!SDL_GetRenderOutputSize(renderer, &LEScreenWidth, &LEScreenHeight)) {
+        fprintf(stderr, "Something went wrong while getting renderer output size! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
+    }
+
     return true;
 }
 
@@ -82,7 +90,7 @@ void DestroyText(struct LE_Text * const pLEText) {
 bool UpdateText(struct LE_Text * const pLEText) {
     DestroyText(pLEText);
 
-    if (!(pLEText->surface = TTF_RenderText_Shaded_Wrapped(pLEGameFont, pLEText->text, 0, pLEText->fg, pLEText->bg, 0))) {
+    if (!(pLEText->surface = TTF_RenderText_Shaded_Wrapped(LEGameFont, pLEText->text, 0, pLEText->fg, pLEText->bg, 0))) {
         fprintf(stderr, "Failed to render text! (text: %s) (SDL Error Code: %s)\n", pLEText->text, SDL_GetError());
         return false;
     }
@@ -129,18 +137,21 @@ void LECleanupScene() {
     }
 }
 
-static struct timespec last_frame_time;
-static struct timespec now;
+static Uint64 last_frame_time;
+static Uint64 now;
 static double frametime;
 
 bool LEStepRender(double *pFrametime) {
-    clock_gettime(CLOCK_MONOTONIC, &now);
+    now = SDL_GetTicksNS();
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         /* If escape is held down OR a window close is requested, return false. */
         if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
             return false;
+        }
+        if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+            SDL_GetRenderOutputSize(renderer, &LEScreenWidth, &LEScreenHeight);
         }
     }
 
@@ -160,7 +171,7 @@ bool LEStepRender(double *pFrametime) {
     SDL_RenderPresent(renderer);
     
     /* this sometimes dips in the negatives, WHY? */
-    frametime = difftime(now.tv_nsec, last_frame_time.tv_nsec) / 1000000000;
+    frametime = (now - last_frame_time) / 1000000000.0;
     if (pFrametime) {
         *pFrametime = frametime;
     }

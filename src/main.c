@@ -15,8 +15,8 @@ int main() {
     if (!LEInitWindow() || !LEInitTTF())
         return 1;
 
-    pLEGameFont = TTF_OpenFont("AdwaitaMono-Regular.ttf", 24);
-    if (!pLEGameFont) {
+    LEGameFont = TTF_OpenFont("AdwaitaMono-Regular.ttf", 24);
+    if (!LEGameFont) {
         printf("Failed to load game font! (SDL Error Code: %s)\n", SDL_GetError());
         return 1;
     }
@@ -29,8 +29,8 @@ int main() {
         printf("frametime: %fms (%ld FPS)\n", frametime * 1000, SDL_lround(1 / frametime));
     }
 
-    TTF_CloseFont(pLEGameFont);
-    pLEGameFont = NULL;
+    TTF_CloseFont(LEGameFont);
+    LEGameFont = NULL;
     
     LECleanupScene();
     LEDestroyWindow();

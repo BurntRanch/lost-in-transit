@@ -5,7 +5,9 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include <stdbool.h>
 
-extern TTF_Font *pLEGameFont;
+extern TTF_Font *LEGameFont;
+
+extern int LEScreenWidth, LEScreenHeight;
 
 struct LE_Text {
     /* The surface, usually created through functions like `TTF_RenderText_Shaded_Wrapped`. */
