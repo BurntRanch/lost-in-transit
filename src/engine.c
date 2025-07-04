@@ -1,10 +1,11 @@
-#include <SDL3/SDL_timer.h>
 #define TITLE "Lost In Transit"
 
 #include "engine.h"
 #include "main_menu.h"
 #include "scenes.h"
+#include "options.h"
 
+#include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
@@ -43,7 +44,7 @@ void LEDestroyWindow(void) {
 }
 
 bool LEInitWindow(void) {
-    if (!(window = SDL_CreateWindow(TITLE, 800, 600, SDL_WINDOW_VULKAN))) {
+    if (!(window = SDL_CreateWindow(TITLE, 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE))) {
         fprintf(stderr, "Something went wrong while creating a window! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
@@ -119,6 +120,10 @@ bool LELoadScene(const Uint8 scene) {
             return false;
         }
         break;
+    case SCENE_OPTIONS:
+        if (!OptionsInit(renderer)) {
+            return false;
+        }
     default:
         ;
     }
@@ -137,6 +142,9 @@ void LECleanupScene() {
     switch (scene_loaded) {
     case SCENE_MAINMENU:
         MainMenuCleanup();
+        break;
+    case SCENE_OPTIONS:
+        OptionsCleanup();
         break;
     default:
         ;
@@ -175,6 +183,11 @@ bool LEStepRender(double *pFrametime) {
     switch (scene_loaded) {
     case SCENE_MAINMENU:
         if (!MainMenuRender(&frametime)) {
+            return false;
+        }
+        break;
+    case SCENE_OPTIONS:
+        if (!OptionsRender(&frametime)) {
             return false;
         }
         break;

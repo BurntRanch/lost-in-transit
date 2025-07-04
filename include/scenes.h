@@ -4,5 +4,6 @@
 #define SCENE_UNKNOWN 0
 #define SCENE_NONE 1
 #define SCENE_MAINMENU 2
+#define SCENE_OPTIONS 3
 
 #endif
