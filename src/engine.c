@@ -118,7 +118,7 @@ bool LELoadScene(const Uint8 scene) {
         if (!MainMenuInit(renderer)) {
             return false;
         }
-    case SCENE_NONE:
+        break;
     default:
         ;
     }
@@ -127,11 +127,17 @@ bool LELoadScene(const Uint8 scene) {
     return true;
 }
 
+static Uint8 scene_to_load = SCENE_UNKNOWN;
+
+void LEScheduleLoadScene(const Uint8 scene) {
+    scene_to_load = scene;
+}
+
 void LECleanupScene() {
     switch (scene_loaded) {
     case SCENE_MAINMENU:
         MainMenuCleanup();
-    case SCENE_NONE:
+        break;
     default:
         ;
     }
@@ -157,13 +163,21 @@ bool LEStepRender(double *pFrametime) {
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
+
+    if (scene_to_load != SCENE_UNKNOWN) {
+        if (!LELoadScene(scene_to_load)) {
+            return false;
+        }
+
+        scene_to_load = SCENE_UNKNOWN;
+    }
     
     switch (scene_loaded) {
     case SCENE_MAINMENU:
         if (!MainMenuRender(&frametime)) {
             return false;
         }
-    case SCENE_NONE:
+        break;
     default:
         ;
     }

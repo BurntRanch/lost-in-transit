@@ -1,5 +1,6 @@
 #include "main_menu.h"
 #include "engine.h"
+#include "scenes.h"
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_mouse.h>
@@ -57,6 +58,10 @@ static SDL_FRect dstrect = {0, 0, 0, 0};
 /* time elapsed since last fixed update, updates every single render step. */
 static double fixed_update_counter = 0.0;
 
+static void PlayButtonPressed() {
+    LEScheduleLoadScene(SCENE_NONE);
+}
+
 bool MainMenuRender(const double * const delta) {
     // total_time += *delta;
     fixed_update_counter += *delta;
@@ -80,6 +85,10 @@ bool MainMenuRender(const double * const delta) {
         if ((dstrect.x <= x && x <= dstrect.w + dstrect.x) &&
             (dstrect.y <= y && y <= dstrect.h + dstrect.y)) {
                 if (!play_button_active || (mouse1_held != play_button_held)) {
+                    if (play_button_active && mouse1_held) {
+                        PlayButtonPressed();
+                    }
+
                     play_button_active = true;
                     play_button_held = mouse1_held;
 

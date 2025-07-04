@@ -2,6 +2,7 @@
 #define RENDERER_H
 
 #include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_stdinc.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <stdbool.h>
 
@@ -45,6 +46,17 @@ bool UpdateText(struct LE_Text * const pLEText);
  * Returns true on success.
  */
 bool LELoadScene(const Uint8 scene);
+
+/* Schedules a scene load. Refer to scenes.h
+ *
+ * The scene load will not take effect instantly. It will take effect at the start of the next frame.
+ * Useful if a scene wants to safely change scenes during its render function.
+ *
+ * Only one scene load can take place at a time. The last call to this function will take precedence.
+ *
+ * Returns true on success.
+ */
+void LEScheduleLoadScene(const Uint8 scene);
 
 /* Render the current game state.
  *

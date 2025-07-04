@@ -1,7 +1,8 @@
 #ifndef SCENES_H
 #define SCENES_H
 
-#define SCENE_NONE 0
-#define SCENE_MAINMENU 1
+#define SCENE_UNKNOWN 0
+#define SCENE_NONE 1
+#define SCENE_MAINMENU 2
 
 #endif
