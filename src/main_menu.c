@@ -16,7 +16,9 @@
 
 #define FIXED_UPDATE_TIME 0.016
 
+/* 5% every FIXED_UPDATE_TIME milliseconds */
 #define BUTTON_ANGLE_PERCENTAGE_INCREMENT 0.05f
+
 #define BUTTON_ANGLE_PERCENTAGE_MAX 1.0f - BUTTON_ANGLE_PERCENTAGE_INCREMENT
 #define BUTTON_ANGLE_PERCENTAGE_MIN BUTTON_ANGLE_PERCENTAGE_INCREMENT
 
@@ -140,15 +142,12 @@ bool MainMenuRender(const double * const delta) {
     exit_dstrect.y = LEScreenHeight * 0.45;
 
     while (fixed_update_timer >= FIXED_UPDATE_TIME) {
-        /* Check if the user is hovering over play button */
         float x, y;
 
         SDL_MouseButtonFlags mouse_state = SDL_GetMouseState(&x, &y);
         bool mouse1_held = mouse_state & SDL_BUTTON_LMASK;
 
-        /* If hovering, check if the play button is inactive. If it's inactive, reload the text with an active background.
-         * Otherwise, if the play button is active, reload the text with an inactive background.
-         */
+        /* Check for hovers, clicks, etc. Apply effects or run callbacks depending on the result. */
         if (!activate_button_if_hovering(x, y,
                                     mouse1_held, &play_text,
                                     &play_dstrect, &play_button_active,
@@ -172,6 +171,8 @@ bool MainMenuRender(const double * const delta) {
                                     (SDL_Color){ 140, 140, 200, SDL_ALPHA_OPAQUE }))
             return false;
         
+        /* animate any buttons that are hovered */
+
         if (play_button_active && play_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
             play_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
         } else if (!play_button_active && play_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {

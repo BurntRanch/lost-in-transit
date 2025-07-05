@@ -41,7 +41,7 @@ void DestroyText(struct LE_Text * const pLEText);
  */
 bool UpdateText(struct LE_Text * const pLEText);
 
-/* Loads a scene **immediately**, This is not safe to run multi-threaded or inside of a scenes render function, Consider calling LEScheduleLoadScene instead.
+/* Loads a scene **immediately**, This is not safe to run multi-threaded or inside of a scenes render function. Consider calling LEScheduleLoadScene for that purpose instead.
  * Refer to scenes.h
  * Returns true on success.
  */

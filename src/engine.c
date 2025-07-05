@@ -183,6 +183,7 @@ bool LEStepRender(double *pFrametime) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
 
+    /* Load scheduled scenes (if any) */
     if (scene_to_load != SCENE_UNKNOWN) {
         if (!LELoadScene(scene_to_load)) {
             return false;
@@ -191,6 +192,7 @@ bool LEStepRender(double *pFrametime) {
         scene_to_load = SCENE_UNKNOWN;
     }
     
+    /* call the right render function for whatever scene we're running right now */
     switch (scene_loaded) {
     case SCENE_MAINMENU:
         if (!MainMenuRender(&frametime)) {
@@ -213,7 +215,6 @@ bool LEStepRender(double *pFrametime) {
 
     SDL_RenderPresent(renderer);
     
-    /* this sometimes dips in the negatives, WHY? */
     frametime = (now - last_frame_time) / 1000000000.0;
     if (pFrametime) {
         *pFrametime = frametime;
