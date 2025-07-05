@@ -49,6 +49,7 @@ bool LEInitWindow(void) {
         fprintf(stderr, "Something went wrong while creating a window! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
+    SDL_SetWindowMinimumSize(window, 400, 300);
 
     if (!(surface = SDL_GetWindowSurface(window))) {
         fprintf(stderr, "Something went wrong while getting a surface! (SDL Error Code: %s)\n", SDL_GetError());

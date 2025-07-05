@@ -1,4 +1,5 @@
 #include "play.h"
+#include "common.h"
 #include "engine.h"
 #include "scenes.h"
 
@@ -6,6 +7,7 @@
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_surface.h>
 #include <SDL3_image/SDL_image.h>
 
@@ -31,6 +33,30 @@ static float back_button_angle = 0.0f;
 
 static struct SDL_FRect back_dstrect = { 0, 0, 0, 0 };
 
+
+
+static struct LE_Text host_text;
+
+static bool host_button_active = false;
+static bool host_button_held = false;
+
+static float host_button_angle_percentage = 0.0f;
+static float host_button_angle = 0.0f;
+
+static struct SDL_FRect host_dstrect = { 0, 0, 0, 0 };
+
+
+
+static struct LE_Text join_text;
+
+static bool join_button_active = false;
+static bool join_button_held = false;
+
+static float join_button_angle_percentage = 0.0f;
+static float join_button_angle = 0.0f;
+
+static struct SDL_FRect join_dstrect = { 0, 0, 0, 0 };
+
 bool PlayInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
 
@@ -38,45 +64,26 @@ bool PlayInit(SDL_Renderer *pRenderer) {
         fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
+    back_dstrect.w = back_texture->w;
+    back_dstrect.h = back_texture->h;
 
-    return true;
-}
+    host_text.text = "Host a server";
+    host_text.fg = (SDL_Color) { 200, 100, 100, SDL_ALPHA_OPAQUE };
+    host_text.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    if (!UpdateText(&host_text)) {
+        return false;
+    }
+    host_dstrect.w = host_text.surface->w;
+    host_dstrect.h = host_text.surface->h;
 
-/* uh.. returns false if button_pressed == null and the button was pressed */
-static inline bool activate_button_if_hovering(const int x, const int y, const bool mouse1_held, struct LE_Text * const text, const struct SDL_FRect *bounds, bool * const button_active, bool * const button_held, void (* const button_pressed)(), const struct SDL_Color normal_fg) {
-    if ((bounds->x <= x && x <= bounds->w + bounds->x) &&
-            (bounds->y <= y && y <= bounds->h + bounds->y)) {
-                if (!(*button_active) || (mouse1_held != *button_held)) {
-                    if (*button_active && !mouse1_held) {
-                        if (button_pressed)
-                            button_pressed();
-                        else
-                            return false;
-                    }
-
-                    *button_active = true;
-                    *button_held = mouse1_held;
-
-                    if (text && *button_held) {
-                        text->fg = (SDL_Color) { 200, 200, 200, SDL_ALPHA_OPAQUE };
-                    } else if (text) {
-                        text->fg = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
-                    }
-
-                    if (text && !UpdateText(text)) {
-                        return false;
-                    }
-                }
-            } else if (*button_active) {
-                *button_active = false;
-
-                if (text) {
-                    text->fg = normal_fg;
-                    if (!UpdateText(text)) {
-                        return false;
-                    }
-                }
-            }
+    join_text.text = "Join a server";
+    join_text.fg = (SDL_Color) { 100, 100, 200, SDL_ALPHA_OPAQUE };
+    join_text.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    if (!UpdateText(&join_text)) {
+        return false;
+    }
+    join_dstrect.w = join_text.surface->w;
+    join_dstrect.h = join_text.surface->h;
 
     return true;
 }
@@ -88,13 +95,12 @@ static inline void BackButtonPressed() {
     LEScheduleLoadScene(SCENE_MAINMENU);
 }
 
-/* https://en.wikipedia.org/wiki/Smoothstep */
-static inline float smoothstep(float edge0, float edge1, float x)
-{
-    // Scale, bias and saturate x to 0..1 range
-    x = SDL_clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
-    // Evaluate polynomial
-    return x*x*(3 - 2 * x);
+static inline void HostButtonPressed() {
+    ;   /* idk */
+}
+
+static inline void JoinButtonPressed() {
+    ;   /* idk */
 }
 
 bool PlayRender(const double * const delta) {
@@ -102,8 +108,12 @@ bool PlayRender(const double * const delta) {
 
     back_dstrect.x = LEScreenWidth * 0.0125;
     back_dstrect.y = LEScreenHeight * 0.0125;
-    back_dstrect.w = back_texture->w;
-    back_dstrect.h = back_texture->h;
+
+    host_dstrect.x = SDL_max((LEScreenWidth * 0.25) - (host_dstrect.w / 2), 0);
+    host_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (host_dstrect.h / 2), 0);
+
+    join_dstrect.x = SDL_max((LEScreenWidth * 0.75) - (join_dstrect.w / 2), 0);
+    join_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (join_dstrect.h / 2), 0);
 
     while (fixed_update_timer >= FIXED_UPDATE_TIME) {
         /* Check if the user is hovering over play button */
@@ -119,6 +129,18 @@ bool PlayRender(const double * const delta) {
                                     &back_button_held, BackButtonPressed,
                                     (SDL_Color){ 0,0,0,0 }))
             return false;
+        if (!activate_button_if_hovering(x, y,
+                                    mouse1_held, &host_text,
+                                    &host_dstrect, &host_button_active,
+                                    &host_button_held, HostButtonPressed,
+                                    (SDL_Color){ 200, 100, 100, SDL_ALPHA_OPAQUE }))
+            return false;
+        if (!activate_button_if_hovering(x, y,
+                                    mouse1_held, &join_text,
+                                    &join_dstrect, &join_button_active,
+                                    &join_button_held, JoinButtonPressed,
+                                    (SDL_Color){ 100, 100, 200, SDL_ALPHA_OPAQUE }))
+            return false;
 
         if (back_button_active && back_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
             back_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
@@ -126,13 +148,37 @@ bool PlayRender(const double * const delta) {
             back_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
         }
 
-        back_button_angle = -smoothstep(0.f, 1.f, back_button_angle_percentage)*BUTTON_ANGLE_MAX;
+        if (host_button_active && host_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
+            host_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        } else if (!host_button_active && host_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
+            host_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        }
+
+        if (join_button_active && join_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
+            join_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        } else if (!join_button_active && join_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
+            join_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        }
+
+        back_button_angle = -smoothstep(0.f, 1.f, back_button_angle_percentage)*10;
+        host_button_angle = -smoothstep(0.f, 1.f, host_button_angle_percentage)*BUTTON_ANGLE_MAX;
+        join_button_angle = -smoothstep(0.f, 1.f, join_button_angle_percentage)*BUTTON_ANGLE_MAX;
 
         fixed_update_timer -= FIXED_UPDATE_TIME;
     }
 
     if (!SDL_RenderTextureRotated(renderer, back_texture, NULL, &back_dstrect, back_button_angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render back button! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    if (!SDL_RenderTextureRotated(renderer, host_text.texture, NULL, &host_dstrect, host_button_angle, NULL, SDL_FLIP_NONE)) {
+        fprintf(stderr, "Failed to render host button! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    if (!SDL_RenderTextureRotated(renderer, join_text.texture, NULL, &join_dstrect, join_button_angle, NULL, SDL_FLIP_NONE)) {
+        fprintf(stderr, "Failed to render join button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
 

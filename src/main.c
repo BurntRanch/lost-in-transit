@@ -24,7 +24,7 @@ int main() {
     if (!LELoadScene(SCENE_MAINMENU))
         return 1;
 
-    double frametime;
+    // double frametime;
     while (LEStepRender(NULL)) {
         // printf("frametime: %fms (%ld FPS)\n", frametime * 1000, SDL_lround(1 / frametime));
     }
