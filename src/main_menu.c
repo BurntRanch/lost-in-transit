@@ -15,11 +15,11 @@
 
 #define FIXED_UPDATE_TIME 0.016
 
-#define TEXT_ANGLE_PERCENTAGE_INCREMENT 0.05f
-#define TEXT_ANGLE_PERCENTAGE_MAX 1.0f - TEXT_ANGLE_PERCENTAGE_INCREMENT
-#define TEXT_ANGLE_PERCENTAGE_MIN TEXT_ANGLE_PERCENTAGE_INCREMENT
+#define BUTTON_ANGLE_PERCENTAGE_INCREMENT 0.05f
+#define BUTTON_ANGLE_PERCENTAGE_MAX 1.0f - BUTTON_ANGLE_PERCENTAGE_INCREMENT
+#define BUTTON_ANGLE_PERCENTAGE_MIN BUTTON_ANGLE_PERCENTAGE_INCREMENT
 
-#define TEXT_ANGLE_MAX 5
+#define BUTTON_ANGLE_MAX 5
 
 static SDL_Renderer *renderer = NULL;
 
@@ -115,10 +115,10 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
 // static double total_time = 0.0;
 
 /* time elapsed since last fixed update, updates every single render step. */
-static double fixed_update_counter = 0.0;
+static double fixed_update_timer = 0.0;
 
 static inline void PlayButtonPressed() {
-    // LEScheduleLoadScene(SCENE_NONE);
+    LEScheduleLoadScene(SCENE_PLAY);
 }
 
 static inline void OptionsButtonPressed() {
@@ -173,7 +173,7 @@ static inline bool activate_button_if_hovering(const int x, const int y, const b
 
 bool MainMenuRender(const double * const delta) {
     // total_time += *delta;
-    fixed_update_counter += *delta;
+    fixed_update_timer += *delta;
 
     play_dstrect.x = LEScreenWidth * 0.0225;
     play_dstrect.y = LEScreenHeight * 0.25;
@@ -184,7 +184,7 @@ bool MainMenuRender(const double * const delta) {
     exit_dstrect.x = LEScreenWidth * 0.0225;
     exit_dstrect.y = LEScreenHeight * 0.45;
 
-    while (fixed_update_counter >= FIXED_UPDATE_TIME) {
+    while (fixed_update_timer >= FIXED_UPDATE_TIME) {
         /* Check if the user is hovering over play button */
         float x, y;
 
@@ -217,29 +217,29 @@ bool MainMenuRender(const double * const delta) {
                                     (SDL_Color){ 140, 140, 200, SDL_ALPHA_OPAQUE }))
             return false;
         
-        if (play_button_active && play_button_angle_percentage <= TEXT_ANGLE_PERCENTAGE_MAX) {
-            play_button_angle_percentage += TEXT_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!play_button_active && play_button_angle_percentage >= TEXT_ANGLE_PERCENTAGE_MIN) {
-            play_button_angle_percentage -= TEXT_ANGLE_PERCENTAGE_INCREMENT;
+        if (play_button_active && play_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
+            play_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        } else if (!play_button_active && play_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
+            play_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
         }
 
-        if (options_button_active && options_button_angle_percentage <= TEXT_ANGLE_PERCENTAGE_MAX) {
-            options_button_angle_percentage += TEXT_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!options_button_active && options_button_angle_percentage >= TEXT_ANGLE_PERCENTAGE_MIN) {
-            options_button_angle_percentage -= TEXT_ANGLE_PERCENTAGE_INCREMENT;
+        if (options_button_active && options_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
+            options_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        } else if (!options_button_active && options_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
+            options_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
         }
 
-        if (exit_button_active && exit_button_angle_percentage <= TEXT_ANGLE_PERCENTAGE_MAX) {
-            exit_button_angle_percentage += TEXT_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!exit_button_active && exit_button_angle_percentage >= TEXT_ANGLE_PERCENTAGE_MIN) {
-            exit_button_angle_percentage -= TEXT_ANGLE_PERCENTAGE_INCREMENT;
+        if (exit_button_active && exit_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
+            exit_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        } else if (!exit_button_active && exit_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
+            exit_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
         }
 
-        play_text_angle = -smoothstep(0.f, 1.f, play_button_angle_percentage)*TEXT_ANGLE_MAX;
-        options_text_angle = -smoothstep(0.f, 1.f, options_button_angle_percentage)*TEXT_ANGLE_MAX;
-        exit_text_angle = -smoothstep(0.f, 1.f, exit_button_angle_percentage)*TEXT_ANGLE_MAX;
+        play_text_angle = -smoothstep(0.f, 1.f, play_button_angle_percentage)*BUTTON_ANGLE_MAX;
+        options_text_angle = -smoothstep(0.f, 1.f, options_button_angle_percentage)*BUTTON_ANGLE_MAX;
+        exit_text_angle = -smoothstep(0.f, 1.f, exit_button_angle_percentage)*BUTTON_ANGLE_MAX;
 
-        fixed_update_counter -= FIXED_UPDATE_TIME;
+        fixed_update_timer -= FIXED_UPDATE_TIME;
     }
 
     if (!SDL_RenderTextureRotated(renderer, play_text.texture, NULL, &play_dstrect, play_text_angle, NULL, SDL_FLIP_NONE)) {

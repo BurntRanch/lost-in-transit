@@ -1,3 +1,4 @@
+#include "play.h"
 #define TITLE "Lost In Transit"
 
 #include "engine.h"
@@ -124,6 +125,12 @@ bool LELoadScene(const Uint8 scene) {
         if (!OptionsInit(renderer)) {
             return false;
         }
+        break;
+    case SCENE_PLAY:
+        if (!PlayInit(renderer)) {
+            return false;
+        }
+        break;
     default:
         ;
     }
@@ -145,6 +152,9 @@ void LECleanupScene() {
         break;
     case SCENE_OPTIONS:
         OptionsCleanup();
+        break;
+    case SCENE_PLAY:
+        PlayCleanup();
         break;
     default:
         ;
@@ -188,6 +198,11 @@ bool LEStepRender(double *pFrametime) {
         break;
     case SCENE_OPTIONS:
         if (!OptionsRender(&frametime)) {
+            return false;
+        }
+        break;
+    case SCENE_PLAY:
+        if (!PlayRender(&frametime)) {
             return false;
         }
         break;
