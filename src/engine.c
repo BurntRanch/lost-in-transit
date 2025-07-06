@@ -1,10 +1,11 @@
-#include "play.h"
 #define TITLE "Lost In Transit"
 
 #include "engine.h"
 #include "main_menu.h"
 #include "scenes.h"
 #include "options.h"
+#include "host.h"
+#include "play.h"
 
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
@@ -132,6 +133,10 @@ bool LELoadScene(const Uint8 scene) {
             return false;
         }
         break;
+    case SCENE_HOST:
+        if (!HostInit(renderer)) {
+            return false;
+        }
     default:
         ;
     }
@@ -157,6 +162,8 @@ void LECleanupScene() {
     case SCENE_PLAY:
         PlayCleanup();
         break;
+    case SCENE_HOST:
+        HostCleanup();
     default:
         ;
     }
@@ -206,6 +213,11 @@ bool LEStepRender(double *pFrametime) {
         break;
     case SCENE_PLAY:
         if (!PlayRender(&frametime)) {
+            return false;
+        }
+        break;
+    case SCENE_HOST:
+        if (!HostRender(&frametime)) {
             return false;
         }
         break;

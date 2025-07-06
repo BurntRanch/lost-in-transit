@@ -16,14 +16,6 @@
 
 #define FIXED_UPDATE_TIME 0.016
 
-/* 5% every FIXED_UPDATE_TIME milliseconds */
-#define BUTTON_ANGLE_PERCENTAGE_INCREMENT 0.05f
-
-#define BUTTON_ANGLE_PERCENTAGE_MAX 1.0f - BUTTON_ANGLE_PERCENTAGE_INCREMENT
-#define BUTTON_ANGLE_PERCENTAGE_MIN BUTTON_ANGLE_PERCENTAGE_INCREMENT
-
-#define BUTTON_ANGLE_MAX 5
-
 static SDL_Renderer *renderer = NULL;
 
 /*** Title Text ***/
@@ -226,4 +218,7 @@ bool MainMenuRender(const double * const delta) {
 
 void MainMenuCleanup(void) {
     DestroyText(&title_text);
+    DestroyText(&play_text);
+    DestroyText(&options_text);
+    DestroyText(&exit_text);
 }

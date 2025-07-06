@@ -6,6 +6,14 @@
 #include <stdbool.h>
 #include <SDL3/SDL_rect.h>
 
+#define FIXED_UPDATE_TIME 0.016
+
+#define BUTTON_ANGLE_PERCENTAGE_INCREMENT 0.05f
+#define BUTTON_ANGLE_PERCENTAGE_MAX 1.0f - BUTTON_ANGLE_PERCENTAGE_INCREMENT
+#define BUTTON_ANGLE_PERCENTAGE_MIN BUTTON_ANGLE_PERCENTAGE_INCREMENT
+
+#define BUTTON_ANGLE_MAX 5
+
 /* https://en.wikipedia.org/wiki/Smoothstep */
 static inline float smoothstep(float edge0, float edge1, float x)
 {

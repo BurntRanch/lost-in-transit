@@ -6,5 +6,6 @@
 #define SCENE_MAINMENU 2
 #define SCENE_OPTIONS 3
 #define SCENE_PLAY 4
+#define SCENE_HOST 5
 
 #endif

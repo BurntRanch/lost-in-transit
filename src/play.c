@@ -13,14 +13,6 @@
 
 #include <stdio.h>
 
-#define FIXED_UPDATE_TIME 0.016
-
-#define BUTTON_ANGLE_PERCENTAGE_INCREMENT 0.05f
-#define BUTTON_ANGLE_PERCENTAGE_MAX 1.0f - BUTTON_ANGLE_PERCENTAGE_INCREMENT
-#define BUTTON_ANGLE_PERCENTAGE_MIN BUTTON_ANGLE_PERCENTAGE_INCREMENT
-
-#define BUTTON_ANGLE_MAX 5
-
 static SDL_Renderer *renderer = NULL;
 
 static struct SDL_Texture *back_texture = NULL;
@@ -96,7 +88,7 @@ static inline void BackButtonPressed() {
 }
 
 static inline void HostButtonPressed() {
-    ;   /* idk */
+    LEScheduleLoadScene(SCENE_HOST);
 }
 
 static inline void JoinButtonPressed() {
@@ -116,7 +108,6 @@ bool PlayRender(const double * const delta) {
     join_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (join_dstrect.h / 2), 0);
 
     while (fixed_update_timer >= FIXED_UPDATE_TIME) {
-        /* Check if the user is hovering over play button */
         float x, y;
 
         SDL_MouseButtonFlags mouse_state = SDL_GetMouseState(&x, &y);
@@ -187,4 +178,6 @@ bool PlayRender(const double * const delta) {
 
 void PlayCleanup(void) {
     SDL_DestroyTexture(back_texture);
+    DestroyText(&host_text);
+    DestroyText(&join_text);
 }
