@@ -1,4 +1,5 @@
 CC       	= gcc
+CXX			= g++
 
 DEBUG 		?= 1
 
@@ -21,11 +22,14 @@ NAME		 = game
 TARGET		?= $(NAME)
 VERSION    	 = 1.0.0
 SRC_CC  	 = $(wildcard src/*.c)
+SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
-OBJ		 = $(OBJ_CC)
-LDFLAGS   	+= -lSDL3 -lSDL3_ttf -lSDL3_image
+OBJ_CXX		 = $(SRC_CXX:.cc=.o)
+OBJ		 = $(OBJ_CC) $(OBJ_CXX)
+LDFLAGS   	+= -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets
 CFLAGS  	?= -mtune=generic -march=native
-CFLAGS        += -fvisibility=hidden -Iinclude $(VARS) -DVERSION=\"$(VERSION)\"
+CFLAGS        += -fvisibility=hidden -Iinclude -I/usr/local/include/GameNetworkingSockets $(VARS) -DVERSION=\"$(VERSION)\"
+CXXFLAGS	= $(CFLAGS)
 
 all: $(TARGET)
 $(TARGET): $(OBJ)

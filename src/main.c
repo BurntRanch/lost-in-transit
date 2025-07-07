@@ -12,7 +12,7 @@
 int main() {
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 
-    if (!LEInitWindow() || !LEInitTTF())
+    if (!LEInitWindow() || !LEInitTTF() || !LEInitSteam())
         return 1;
 
     LEGameFont = TTF_OpenFont("AdwaitaMono-Regular.ttf", 24);

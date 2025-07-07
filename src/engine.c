@@ -22,6 +22,8 @@
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include "steam.hh"
+
 #include <stdio.h>
 #include <time.h>
 
@@ -77,6 +79,10 @@ bool LEInitTTF(void) {
     }
 
     return true;
+}
+
+bool LEInitSteam(void) {
+    return SRInitGNS();
 }
 
 void DestroyText(struct LE_Text * const pLEText) {
@@ -164,6 +170,7 @@ void LECleanupScene() {
         break;
     case SCENE_HOST:
         HostCleanup();
+        break;
     default:
         ;
     }

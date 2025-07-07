@@ -25,6 +25,9 @@ bool LEInitWindow(void);
 /* Returns true on success. */
 bool LEInitTTF(void);
 
+/* So far, only initializes GameNetworkingSockets. This will change to initialize the full Steam API. (once I actually get my hands on it) */
+bool LEInitSteam(void);
+
 /* Free all resources related to an LE_Text struct 
  *
  * You can not render the LE_Text struct anymore, but you can run UpdateText on it again.

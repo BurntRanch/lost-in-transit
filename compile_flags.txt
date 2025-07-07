@@ -1,3 +1,4 @@
 -I./include
+-I/usr/local/include/GameNetworkingSockets
 -Wall
 -Wextra

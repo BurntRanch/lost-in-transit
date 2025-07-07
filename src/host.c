@@ -2,6 +2,7 @@
 #include "common.h"
 #include "engine.h"
 #include "scenes.h"
+#include "steam.hh"
 
 #include <SDL3/SDL_clipboard.h>
 #include <SDL3/SDL_error.h>
@@ -14,6 +15,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+/* the IP address */
+static char *ip = NULL;
 
 static SDL_Renderer *renderer = NULL;
 
@@ -60,7 +65,16 @@ bool HostInit(SDL_Renderer *pRenderer) {
         return false;
     }
 
-    ip_text.text = "IP: 31.41.59.26";   /* have some pie! */
+    ip = NULL;
+    if (!(ip = SRStartServer(63288))) {
+        return false;
+    }
+
+    ip_text.text = malloc(256);
+    ip_text.text[0] = '\0';
+    strncat(ip_text.text, "IP: ", 5);
+    strncat(ip_text.text, ip, 128);
+
     ip_text.fg = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
     ip_text.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
     if (!UpdateText(&ip_text)) {
@@ -83,7 +97,7 @@ static double fixed_update_timer = 0.0;
 static bool copy_button_apply_effect = false;
 
 static inline void CopyButtonPressed() {
-    SDL_SetClipboardText("<insert IP>");
+    SDL_SetClipboardText(ip);
     copy_button_apply_effect = !copy_button_apply_effect;
 }
 
@@ -173,6 +187,11 @@ bool HostRender(const double * const delta) {
 
 void HostCleanup(void) {
     DestroyText(&ip_text);
+    free(ip_text.text);
+    free(ip);
+
     SDL_DestroyTexture(back_texture);
     SDL_DestroyTexture(copy_texture);
+
+    SRStopServer();
 }
