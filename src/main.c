@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "scenes.h"
+#include "steam.hh"
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_hints.h>
@@ -34,6 +35,8 @@ int main() {
     
     LECleanupScene();
     LEDestroyWindow();
+    SRStopServer();
+    SRDisconnectFromServer();
     TTF_Quit();
     SDL_Quit();
 

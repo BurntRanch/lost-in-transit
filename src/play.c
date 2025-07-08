@@ -39,15 +39,15 @@ static struct SDL_FRect host_dstrect = { 0, 0, 0, 0 };
 
 
 
-static struct LE_Text join_text;
+static struct LE_Text connect_text;
 
-static bool join_button_active = false;
-static bool join_button_held = false;
+static bool connect_button_active = false;
+static bool connect_button_held = false;
 
-static float join_button_angle_percentage = 0.0f;
-static float join_button_angle = 0.0f;
+static float connect_button_angle_percentage = 0.0f;
+static float connect_button_angle = 0.0f;
 
-static struct SDL_FRect join_dstrect = { 0, 0, 0, 0 };
+static struct SDL_FRect connect_dstrect = { 0, 0, 0, 0 };
 
 bool PlayInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
@@ -59,7 +59,7 @@ bool PlayInit(SDL_Renderer *pRenderer) {
     back_dstrect.w = back_texture->w;
     back_dstrect.h = back_texture->h;
 
-    host_text.text = "Host a server";
+    host_text.text = "Host server";
     host_text.fg = (SDL_Color) { 200, 100, 100, SDL_ALPHA_OPAQUE };
     host_text.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
     if (!UpdateText(&host_text)) {
@@ -68,14 +68,14 @@ bool PlayInit(SDL_Renderer *pRenderer) {
     host_dstrect.w = host_text.surface->w;
     host_dstrect.h = host_text.surface->h;
 
-    join_text.text = "Join a server";
-    join_text.fg = (SDL_Color) { 100, 100, 200, SDL_ALPHA_OPAQUE };
-    join_text.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
-    if (!UpdateText(&join_text)) {
+    connect_text.text = "Connect to server";
+    connect_text.fg = (SDL_Color) { 100, 100, 200, SDL_ALPHA_OPAQUE };
+    connect_text.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    if (!UpdateText(&connect_text)) {
         return false;
     }
-    join_dstrect.w = join_text.surface->w;
-    join_dstrect.h = join_text.surface->h;
+    connect_dstrect.w = connect_text.surface->w;
+    connect_dstrect.h = connect_text.surface->h;
 
     return true;
 }
@@ -91,8 +91,8 @@ static inline void HostButtonPressed() {
     LEScheduleLoadScene(SCENE_HOST);
 }
 
-static inline void JoinButtonPressed() {
-    ;   /* idk */
+static inline void ConnectButtonPressed() {
+    LEScheduleLoadScene(SCENE_CONNECT);
 }
 
 bool PlayRender(const double * const delta) {
@@ -104,8 +104,8 @@ bool PlayRender(const double * const delta) {
     host_dstrect.x = SDL_max((LEScreenWidth * 0.25) - (host_dstrect.w / 2), 0);
     host_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (host_dstrect.h / 2), 0);
 
-    join_dstrect.x = SDL_max((LEScreenWidth * 0.75) - (join_dstrect.w / 2), 0);
-    join_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (join_dstrect.h / 2), 0);
+    connect_dstrect.x = SDL_max((LEScreenWidth * 0.75) - (connect_dstrect.w / 2), 0);
+    connect_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (connect_dstrect.h / 2), 0);
 
     while (fixed_update_timer >= FIXED_UPDATE_TIME) {
         float x, y;
@@ -127,9 +127,9 @@ bool PlayRender(const double * const delta) {
                                     (SDL_Color){ 200, 100, 100, SDL_ALPHA_OPAQUE }))
             return false;
         if (!activate_button_if_hovering(x, y,
-                                    mouse1_held, &join_text,
-                                    &join_dstrect, &join_button_active,
-                                    &join_button_held, JoinButtonPressed,
+                                    mouse1_held, &connect_text,
+                                    &connect_dstrect, &connect_button_active,
+                                    &connect_button_held, ConnectButtonPressed,
                                     (SDL_Color){ 100, 100, 200, SDL_ALPHA_OPAQUE }))
             return false;
 
@@ -145,15 +145,15 @@ bool PlayRender(const double * const delta) {
             host_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
         }
 
-        if (join_button_active && join_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-            join_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!join_button_active && join_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-            join_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        if (connect_button_active && connect_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
+            connect_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
+        } else if (!connect_button_active && connect_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
+            connect_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
         }
 
         back_button_angle = -smoothstep(0.f, 1.f, back_button_angle_percentage)*10;
         host_button_angle = -smoothstep(0.f, 1.f, host_button_angle_percentage)*BUTTON_ANGLE_MAX;
-        join_button_angle = -smoothstep(0.f, 1.f, join_button_angle_percentage)*BUTTON_ANGLE_MAX;
+        connect_button_angle = -smoothstep(0.f, 1.f, connect_button_angle_percentage)*BUTTON_ANGLE_MAX;
 
         fixed_update_timer -= FIXED_UPDATE_TIME;
     }
@@ -168,8 +168,8 @@ bool PlayRender(const double * const delta) {
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, join_text.texture, NULL, &join_dstrect, join_button_angle, NULL, SDL_FLIP_NONE)) {
-        fprintf(stderr, "Failed to render join button! (SDL Error Code: %s)\n", SDL_GetError());
+    if (!SDL_RenderTextureRotated(renderer, connect_text.texture, NULL, &connect_dstrect, connect_button_angle, NULL, SDL_FLIP_NONE)) {
+        fprintf(stderr, "Failed to render connect button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
 
@@ -179,5 +179,5 @@ bool PlayRender(const double * const delta) {
 void PlayCleanup(void) {
     SDL_DestroyTexture(back_texture);
     DestroyText(&host_text);
-    DestroyText(&join_text);
+    DestroyText(&connect_text);
 }

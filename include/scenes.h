@@ -7,5 +7,6 @@
 #define SCENE_OPTIONS 3
 #define SCENE_PLAY 4
 #define SCENE_HOST 5
+#define SCENE_CONNECT 6
 
 #endif

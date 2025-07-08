@@ -1,3 +1,4 @@
+#include "connect.h"
 #define TITLE "Lost In Transit"
 
 #include "engine.h"
@@ -143,6 +144,12 @@ bool LELoadScene(const Uint8 scene) {
         if (!HostInit(renderer)) {
             return false;
         }
+        break;
+    case SCENE_CONNECT:
+        if (!ConnectInit(renderer)) {
+            return false;
+        }
+        break;
     default:
         ;
     }
@@ -171,6 +178,9 @@ void LECleanupScene() {
     case SCENE_HOST:
         HostCleanup();
         break;
+    case SCENE_CONNECT:
+        ConnectCleanup();
+        break;
     default:
         ;
     }
@@ -192,6 +202,10 @@ bool LEStepRender(double *pFrametime) {
         if (event.type == SDL_EVENT_WINDOW_RESIZED) {
             SDL_GetRenderOutputSize(renderer, &LEScreenWidth, &LEScreenHeight);
         }
+    }
+
+    if (!SRPollConnections()) {
+        return false;
     }
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -225,6 +239,11 @@ bool LEStepRender(double *pFrametime) {
         break;
     case SCENE_HOST:
         if (!HostRender(&frametime)) {
+            return false;
+        }
+        break;
+    case SCENE_CONNECT:
+        if (!ConnectRender()) {
             return false;
         }
         break;

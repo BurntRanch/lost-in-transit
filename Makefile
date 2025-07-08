@@ -26,7 +26,7 @@ SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
-LDFLAGS   	+= -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets
+LDFLAGS   	+= -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
 CFLAGS        += -fvisibility=hidden -Iinclude -I/usr/local/include/GameNetworkingSockets $(VARS) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	= $(CFLAGS)
