@@ -20,13 +20,23 @@ enum Role {
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Called by steam.cc, This handles a disconnect event (by high-level means like, letting other players know).
+/* disconnect callbacks may receive a string containing a "reason" behind the disconnect. May be NULL (indicating a normal/requested disconnect)
+ *
+ * the handle may also be 0, if it's set to 0 that means that the failure (never a natural disconnect) happened before a connection could be established.
+ */
+void NETSetServerDisconnectCallback(void (*callback)(const ConnectionHandle, const char * const));
+void NETSetClientDisconnectCallback(void (*callback)(const ConnectionHandle, const char * const));
+
+void NETSetServerConnectCallback(void (*callback)(const ConnectionHandle));
+void NETSetClientConnectCallback(void (*callback)(const ConnectionHandle));
+
+/* Called by steam.cc, This handles a disconnect event at a high-level (high-level as in, letting other players know).
  *
  * If message is non-null, it may be displayed to the user. This is in the case where we have disconnected from a server that we were connected to earlier.
  */
 void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const message);
 
-/* Called by steam.cc, This handles a connect event (by high-level means like, waiting for a "log-in" request and letting other players know) */
+/* Called by steam.cc, This handles a connect event at a high-level (high-level as in, waiting for a "log-in" request and letting other players know) */
 void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
 
 /* Called by steam.cc, only happens from the role of a client that failed to reach a server. in which case this would probably show an error to the user.

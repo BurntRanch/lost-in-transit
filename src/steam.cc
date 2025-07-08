@@ -74,17 +74,11 @@ static void Client_NetConnectionStatusChanged(SteamNetConnectionStatusChangedCal
             break;  /* uh okay */
         case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
         case k_ESteamNetworkingConnectionState_ClosedByPeer:
-            /* connections that were never accepted don't matter to us */
             if (pInfo->m_eOldState == k_ESteamNetworkingConnectionState_Connecting) {
                 /* we were never connected, either we were refused access or something else went wrong. */
                 NETHandleConnectionFailure(pInfo->m_info.m_szEndDebug);
-            } else if (pInfo->m_info.m_eState == k_ESteamNetworkingConnectionState_ProblemDetectedLocally) {
-                char * const message = (char *)malloc(256);
-                SDL_snprintf(message, 256, "Something went wrong! (%s)", pInfo->m_info.m_szEndDebug);
-                
-                NETHandleDisconnect(NET_ROLE_CLIENT, pInfo->m_hConn, message);
             } else {
-                NETHandleDisconnect(NET_ROLE_CLIENT, pInfo->m_hConn, NULL);
+                NETHandleDisconnect(NET_ROLE_CLIENT, pInfo->m_hConn, pInfo->m_info.m_szEndDebug);
             }
 
             SteamNetworkingSockets()->CloseConnection(pInfo->m_hConn, 0, NULL, false);
@@ -143,6 +137,11 @@ char *SRStartServer(Uint16 port) {
 }
 
 void SRStopServer(void) {
+    for (const HSteamNetConnection &conn : server_clients) {
+        SteamNetworkingSockets()->CloseConnection(conn, 0, "Server shutting down", true);
+        server_clients.erase(server_clients.begin());
+    }
+
     SteamNetworkingSockets()->DestroyPollGroup(server_poll_group);
     server_poll_group = k_HSteamNetPollGroup_Invalid;
 
@@ -183,7 +182,7 @@ bool SRConnectToServerIPv6(Uint8 *ipv6, Uint16 port) {
 void SRDisconnectFromServer() {
     if (client_connection) {
         /* TODO: send goodbye message */
-        SteamNetworkingSockets()->CloseConnection(client_connection, 0, NULL, true);
+        SteamNetworkingSockets()->CloseConnection(client_connection, 0, "Disconnecting", true);
         client_connection = k_HSteamNetConnection_Invalid;
     }
 }
