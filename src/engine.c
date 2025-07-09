@@ -1,12 +1,13 @@
-#include "connect.h"
 #define TITLE "Lost In Transit"
 
 #include "engine.h"
-#include "main_menu.h"
 #include "scenes.h"
-#include "options.h"
-#include "host.h"
-#include "play.h"
+
+#include "scenes/main_menu.h"
+#include "scenes/options.h"
+#include "scenes/host.h"
+#include "scenes/play.h"
+#include "scenes/connect.h"
 
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
@@ -243,7 +244,7 @@ bool LEStepRender(double *pFrametime) {
         }
         break;
     case SCENE_CONNECT:
-        if (!ConnectRender()) {
+        if (!ConnectRender(&frametime)) {
             return false;
         }
         break;

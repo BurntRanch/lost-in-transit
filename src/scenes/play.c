@@ -1,4 +1,4 @@
-#include "play.h"
+#include "scenes/play.h"
 #include "common.h"
 #include "engine.h"
 #include "scenes.h"
@@ -104,8 +104,13 @@ bool PlayRender(const double * const delta) {
     host_dstrect.x = SDL_max((LEScreenWidth * 0.25) - (host_dstrect.w / 2), 0);
     host_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (host_dstrect.h / 2), 0);
 
-    connect_dstrect.x = SDL_max((LEScreenWidth * 0.75) - (connect_dstrect.w / 2), 0);
-    connect_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (connect_dstrect.h / 2), 0);
+    if (LEScreenWidth > 600) {
+        connect_dstrect.x = SDL_max((LEScreenWidth * 0.75) - (connect_dstrect.w / 2), 0);
+        connect_dstrect.y = SDL_max((LEScreenHeight * 0.5) - (connect_dstrect.h / 2), 0);
+    } else {
+        connect_dstrect.x = host_dstrect.x;
+        connect_dstrect.y = host_dstrect.y + host_dstrect.h + 5;
+    }
 
     while (fixed_update_timer >= FIXED_UPDATE_TIME) {
         float x, y;
@@ -152,8 +157,8 @@ bool PlayRender(const double * const delta) {
         }
 
         back_button_angle = -smoothstep(0.f, 1.f, back_button_angle_percentage)*10;
-        host_button_angle = -smoothstep(0.f, 1.f, host_button_angle_percentage)*BUTTON_ANGLE_MAX;
-        connect_button_angle = -smoothstep(0.f, 1.f, connect_button_angle_percentage)*BUTTON_ANGLE_MAX;
+        host_button_angle = -smoothstep(0.f, 1.f, host_button_angle_percentage)*2;
+        connect_button_angle = -smoothstep(0.f, 1.f, connect_button_angle_percentage)*2;
 
         fixed_update_timer -= FIXED_UPDATE_TIME;
     }

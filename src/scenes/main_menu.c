@@ -1,4 +1,5 @@
-#include "main_menu.h"
+#include "scenes/main_menu.h"
+
 #include "common.h"
 #include "engine.h"
 #include "scenes.h"
@@ -128,10 +129,10 @@ bool MainMenuRender(const double * const delta) {
     play_dstrect.y = LEScreenHeight * 0.25;
     
     options_dstrect.x = LEScreenWidth * 0.0225;
-    options_dstrect.y = LEScreenHeight * 0.35;
+    options_dstrect.y = SDL_max(LEScreenHeight * 0.35, play_dstrect.y + play_dstrect.h + 5);
     
     exit_dstrect.x = LEScreenWidth * 0.0225;
-    exit_dstrect.y = LEScreenHeight * 0.45;
+    exit_dstrect.y = SDL_max(LEScreenHeight * 0.45, options_dstrect.y + options_dstrect.h + 5);
 
     while (fixed_update_timer >= FIXED_UPDATE_TIME) {
         float x, y;

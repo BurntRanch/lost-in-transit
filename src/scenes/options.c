@@ -1,4 +1,4 @@
-#include "options.h"
+#include "scenes/options.h"
 #include "engine.h"
 #include "scenes.h"
 

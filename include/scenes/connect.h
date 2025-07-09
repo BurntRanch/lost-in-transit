@@ -11,7 +11,7 @@ bool ConnectInit(SDL_Renderer *pRenderer);
 /* Render the connect menu.
  * Returns true if all went well.
  */
-bool ConnectRender();
+bool ConnectRender(const double * const delta);
 
 /* Clean everything up. */
 void ConnectCleanup(void);
