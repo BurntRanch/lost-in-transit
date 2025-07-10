@@ -22,8 +22,6 @@ bool OptionsInit(SDL_Renderer *pRenderer) {
     time_elapsed = 0.0;
 
     title_label.text = "nothing here! switching back in 5 seconds";
-    title_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
-    title_label.fg = (SDL_Color){ 255, 255, 255, SDL_ALPHA_OPAQUE };
     if (!UpdateText(&title_label)) {
         return false;
     }

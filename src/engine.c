@@ -103,7 +103,7 @@ void DestroyText(struct LE_Label * const pLEText) {
 bool UpdateText(struct LE_Label * const pLEText) {
     DestroyText(pLEText);
 
-    if (!(pLEText->surface = TTF_RenderText_Shaded_Wrapped(pLEGameFont, pLEText->text, 0, pLEText->fg, pLEText->bg, 0))) {
+    if (!(pLEText->surface = TTF_RenderText_Shaded_Wrapped(pLEGameFont, pLEText->text, 0, (SDL_Color){255,255,255,SDL_ALPHA_OPAQUE}, (SDL_Color){0,0,0,SDL_ALPHA_TRANSPARENT}, 0))) {
         fprintf(stderr, "Failed to render text! (text: %s) (SDL Error Code: %s)\n", pLEText->text, SDL_GetError());
         return false;
     }

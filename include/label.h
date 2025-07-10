@@ -12,7 +12,6 @@ struct LE_Label {
     SDL_Texture *texture;
 
     char *text;
-    SDL_Color fg, bg;
 };
 
 /* Free all resources related to an LE_Text struct 

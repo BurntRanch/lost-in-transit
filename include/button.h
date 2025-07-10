@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_pixels.h>
 #include <stdbool.h>
 
 struct LE_Button {
@@ -18,6 +19,9 @@ struct LE_Button {
 
     /* The highest angle this button can go. Basically defines what button_angle should be if `angle_perc` == 100%. If 0 then the behavior is disabled. */
     float max_angle;
+
+    /* The color mod that should be applied to element->texture when it's inactive (not held, not hovered) */
+    struct SDL_Color inactive_color_mod;
 
     /* If this is NULL, ButtonStep will return false on press. */
     void (*on_button_pressed)();

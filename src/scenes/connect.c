@@ -18,6 +18,7 @@
 
 static SDL_Renderer *renderer = NULL;
 
+static struct SDL_Texture *back_texture;
 static struct LE_RenderElement back_element;
 static struct LE_Button back_button;
 
@@ -28,12 +29,13 @@ static bool started = false;
 
 static void SetConnectionStatusConnected(const ConnectionHandle _) {
     connection_status_label.text = "Connected!";
-    connection_status_label.fg = (SDL_Color) { 145, 255, 145, SDL_ALPHA_OPAQUE };
     if (!UpdateText(&connection_status_label)) {
         return;
     }
     connection_status_dstrect.w = connection_status_label.surface->w;
     connection_status_dstrect.h = connection_status_label.surface->h;
+
+    SDL_SetTextureColorMod(connection_status_label.texture, 100, 200, 100);
 }
 static void SetConnectionStatusDisconnected(const ConnectionHandle handle, const char * const pReason) {
     if (pReason) {
@@ -46,12 +48,13 @@ static void SetConnectionStatusDisconnected(const ConnectionHandle handle, const
     } else {
         connection_status_label.text = "Disconnected";
     }
-    connection_status_label.fg = (SDL_Color) { 255, 145, 145, SDL_ALPHA_OPAQUE };
     if (!UpdateText(&connection_status_label)) {
         return;
     }
     connection_status_dstrect.w = connection_status_label.surface->w;
     connection_status_dstrect.h = connection_status_label.surface->h;
+
+    SDL_SetTextureColorMod(connection_status_label.texture, 200, 100, 100);
 }
 
 static void BackButtonPressed() {
@@ -62,21 +65,20 @@ bool ConnectInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
     started = false;
 
-    if (!(back_element.texture = IMG_LoadTexture(renderer, "images/back.png"))) {
+    if (!(back_texture = IMG_LoadTexture(renderer, "images/back.png"))) {
         fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    back_element.dstrect.w = ((SDL_Texture *)(back_element.texture))->w;
-    back_element.dstrect.h = ((SDL_Texture *)(back_element.texture))->h;
+    back_element.texture = &back_texture;
+    back_element.dstrect.w = (*back_element.texture)->w;
+    back_element.dstrect.h = (*back_element.texture)->h;
 
     InitButton(&back_button);
-    back_button.max_angle = 10.0f;
+    back_button.max_angle = -10.0f;
     back_button.on_button_pressed = BackButtonPressed;
     back_button.element = &back_element;
 
     connection_status_label.text = "Connecting..";
-    connection_status_label.fg = (SDL_Color) { 200, 200, 200, SDL_ALPHA_OPAQUE };
-    connection_status_label.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
     if (!UpdateText(&connection_status_label)) {
         return false;
     }
@@ -109,7 +111,7 @@ bool ConnectRender(void) {
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, back_element.texture, NULL, &back_button.element->dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *back_element.texture, NULL, &back_button.element->dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render back button! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }

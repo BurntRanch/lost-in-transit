@@ -56,8 +56,6 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
         return false;
     }
 
-    title_label.fg = (SDL_Color){ 255, 255, 255, SDL_ALPHA_OPAQUE };
-    title_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
     title_label.text = SDL_malloc(256);
     SDL_memcpy(title_label.text, "Lost in Transit", 16);
     if (!UpdateText(&title_label)) {
@@ -66,13 +64,11 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
     title_dstrect.w = title_label.surface->w;
     title_dstrect.h = title_label.surface->h;
 
-    play_label.fg = (SDL_Color){ 200, 140, 140, SDL_ALPHA_OPAQUE };
-    play_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+
     play_label.text = "Play!";
     if (!UpdateText(&play_label)) {
         return false;
     }
-
     play_element.texture = &play_label.texture;
     play_element.dstrect.w = play_label.surface->w;
     play_element.dstrect.h = play_label.surface->h;
@@ -80,9 +76,9 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
     InitButton(&play_button);
     play_button.element = &play_element;
     play_button.on_button_pressed = PlayButtonPressed;
+    play_button.inactive_color_mod = (SDL_Color){ 200, 100, 100, 0 };
 
-    options_label.fg = (SDL_Color){ 140, 200, 140, SDL_ALPHA_OPAQUE };
-    options_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+
     options_label.text = "Options";
     if (!UpdateText(&options_label)) {
         return false;
@@ -95,9 +91,9 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
     InitButton(&options_button);
     options_button.element = &options_element;
     options_button.on_button_pressed = OptionsButtonPressed;
+    options_button.inactive_color_mod = (SDL_Color){ 100, 200, 100, 0 };
 
-    exit_label.fg = (SDL_Color){ 140, 140, 200, SDL_ALPHA_OPAQUE };
-    exit_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+
     exit_label.text = "Exit";
     if (!UpdateText(&exit_label)) {
         return false;
@@ -109,6 +105,7 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
 
     InitButton(&exit_button);
     exit_button.element = &exit_element;
+    exit_button.inactive_color_mod = (SDL_Color){ 100, 100, 200, 0 };
 
     return true;
 }
@@ -136,17 +133,15 @@ bool MainMenuRender(void) {
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, play_element.texture, NULL, &play_element.dstrect, play_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)play_element.texture, NULL, &play_element.dstrect, play_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Play button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-
-    if (!SDL_RenderTextureRotated(renderer, options_element.texture, NULL, &options_element.dstrect, options_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)options_element.texture, NULL, &options_element.dstrect, options_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Options button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-
-    if (!SDL_RenderTextureRotated(renderer, exit_element.texture, NULL, &exit_element.dstrect, exit_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)exit_element.texture, NULL, &exit_element.dstrect, exit_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Exit button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }

@@ -23,12 +23,14 @@ static char *ip = NULL;
 
 static SDL_Renderer *renderer = NULL;
 
+static struct SDL_Texture *back_texture;
 static struct LE_RenderElement back_element;
 static struct LE_Button back_button;
 
 static struct LE_Label ip_label;
 static struct SDL_FRect ip_dstrect;
 
+static struct SDL_Texture *copy_texture;
 static struct LE_RenderElement copy_element;
 static struct LE_Button copy_button;
 
@@ -47,25 +49,27 @@ static inline void BackButtonPressed() {
 bool HostInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
 
-    if (!(back_element.texture = IMG_LoadTexture(renderer, "images/back.png"))) {
+    if (!(back_texture = IMG_LoadTexture(renderer, "images/back.png"))) {
         fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    back_element.dstrect.w = ((SDL_Texture *)back_element.texture)->w;
-    back_element.dstrect.h = ((SDL_Texture *)back_element.texture)->h;
+    back_element.texture = &back_texture;
+    back_element.dstrect.w = (*back_element.texture)->w;
+    back_element.dstrect.h = (*back_element.texture)->h;
 
     InitButton(&back_button);
-    back_button.max_angle = 10.0f;
+    back_button.max_angle = -10.0f;
     back_button.on_button_pressed = BackButtonPressed;
     back_button.element = &back_element;
 
-    if (!(copy_element.texture = IMG_LoadTexture(renderer, "images/copy.png"))) {
+    if (!(copy_texture = IMG_LoadTexture(renderer, "images/copy.png"))) {
         fprintf(stderr, "Failed to load 'images/copy.png'! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
+    copy_element.texture = &copy_texture;
 
     InitButton(&copy_button);
-    copy_button.max_angle = 10.0f;
+    copy_button.max_angle = -10.0f;
     copy_button.on_button_pressed = CopyButtonPressed;
     copy_button.element = &copy_element;
 
@@ -79,8 +83,7 @@ bool HostInit(SDL_Renderer *pRenderer) {
     strncat(ip_label.text, "IP: ", 5);
     strncat(ip_label.text, ip, 128);
 
-    ip_label.fg = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
-    ip_label.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+
     if (!UpdateText(&ip_label)) {
         return false;
     }
@@ -120,24 +123,24 @@ bool HostRender(void) {
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, back_element.texture, NULL, &back_element.dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *back_element.texture, NULL, &back_element.dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render back button! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
     if (copy_button_apply_effect) {
-        if (!SDL_SetTextureColorMod(copy_element.texture, 20, 235, 20)) {
+        if (!SDL_SetTextureColorMod(*copy_element.texture, 20, 235, 20)) {
             fprintf(stderr, "Failed to set texture color modulation! (SDL Error: %s)\n", SDL_GetError());
             return false;
         }
     } else {
-        if (!SDL_SetTextureColorMod(copy_element.texture, 255, 255, 255)) {
+        if (!SDL_SetTextureColorMod(*copy_element.texture, 255, 255, 255)) {
             fprintf(stderr, "Failed to set texture color modulation! (SDL Error: %s)\n", SDL_GetError());
             return false;
         }
     }
 
-    if (!SDL_RenderTextureRotated(renderer, copy_element.texture, NULL, &copy_element.dstrect, copy_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)copy_element.texture, NULL, &copy_element.dstrect, copy_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render copy button! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
@@ -150,8 +153,8 @@ void HostCleanup(void) {
     free(ip_label.text);
     free(ip);
 
-    SDL_DestroyTexture(back_element.texture);
-    SDL_DestroyTexture(copy_element.texture);
+    SDL_DestroyTexture(*back_element.texture);
+    SDL_DestroyTexture(*copy_element.texture);
 
     SRStopServer();
 }

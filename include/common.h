@@ -2,6 +2,7 @@
 #define COMMON_H
 
 #include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_render.h>
 #include <stdbool.h>
 #include <SDL3/SDL_rect.h>
 
@@ -20,7 +21,7 @@ struct MouseInfo {
 
 struct LE_RenderElement {
     /* Not used. It's the user's choice to use this variable to store a texture object (typically an SDL_Texture pointer) */
-    void *texture;
+    SDL_Texture **texture;
 
     /* Where this element is to be rendered. */
     struct SDL_FRect dstrect;
@@ -52,6 +53,7 @@ static inline bool activate_button_if_hovering(const int x, const int y, const b
                 }
             } else if (*button_active) {
                 *button_active = false;
+                *button_held = false;
             }
 
     return true;
