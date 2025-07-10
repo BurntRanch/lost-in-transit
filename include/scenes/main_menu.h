@@ -12,7 +12,7 @@ bool MainMenuInit(SDL_Renderer *pRenderer);
 /* Render the main menu.
  * Returns true if all went well.
  */
-bool MainMenuRender(const double * const delta);
+bool MainMenuRender(void);
 
 /* Clean everything up. */
 void MainMenuCleanup(void);

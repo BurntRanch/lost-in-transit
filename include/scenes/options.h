@@ -11,7 +11,7 @@ bool OptionsInit(SDL_Renderer *pRenderer);
 /* Render the options menu.
  * Returns true if all went well.
  */
-bool OptionsRender(const double * const delta);
+bool OptionsRender(void);
 
 /* Clean everything up. */
 void OptionsCleanup(void);

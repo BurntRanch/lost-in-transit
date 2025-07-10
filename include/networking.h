@@ -24,17 +24,17 @@ extern "C" {
  *
  * the handle may also be 0, if it's set to 0 that means that the failure (never a natural disconnect) happened before a connection could be established.
  */
-void NETSetServerDisconnectCallback(void (*callback)(const ConnectionHandle, const char * const));
-void NETSetClientDisconnectCallback(void (*callback)(const ConnectionHandle, const char * const));
+void NETSetServerDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char * const));
+void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char * const));
 
-void NETSetServerConnectCallback(void (*callback)(const ConnectionHandle));
-void NETSetClientConnectCallback(void (*callback)(const ConnectionHandle));
+void NETSetServerConnectCallback(void (*pCallback)(const ConnectionHandle));
+void NETSetClientConnectCallback(void (*pCallback)(const ConnectionHandle));
 
 /* Called by steam.cc, This handles a disconnect event at a high-level (high-level as in, letting other players know).
  *
  * If message is non-null, it may be displayed to the user. This is in the case where we have disconnected from a server that we were connected to earlier.
  */
-void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const message);
+void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const pMessage);
 
 /* Called by steam.cc, This handles a connect event at a high-level (high-level as in, waiting for a "log-in" request and letting other players know) */
 void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
@@ -44,7 +44,7 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
  * This function will make no attempt to clean up anything. If the server was already previously connected, NETHandleDisconnect (with a message) should be called instead.
  * Speaking of showing errors, it will show the reason to the user. If the reason is null it's an "unexpected" error.
  */
-void NETHandleConnectionFailure(const char * const reason);
+void NETHandleConnectionFailure(const char * const pReason);
 
 #ifdef __cplusplus
 }

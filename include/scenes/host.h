@@ -11,7 +11,7 @@ bool HostInit(SDL_Renderer *pRenderer);
 /* Render the host menu.
  * Returns true if all went well.
  */
-bool HostRender(const double * const delta);
+bool HostRender(void);
 
 /* Clean everything up. */
 void HostCleanup(void);

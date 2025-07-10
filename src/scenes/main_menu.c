@@ -1,7 +1,9 @@
 #include "scenes/main_menu.h"
 
+#include "button.h"
 #include "common.h"
 #include "engine.h"
+#include "label.h"
 #include "scenes.h"
 
 #include <SDL3/SDL_error.h>
@@ -20,98 +22,23 @@
 static SDL_Renderer *renderer = NULL;
 
 /*** Title Text ***/
-static struct LE_Text title_text;
-
+static struct LE_Label title_label;
 static SDL_FRect title_dstrect;
 
 /*** Play Button/Text ***/
-static struct LE_Text play_text;
-static float play_text_angle = 0.f;
-
-static bool play_button_active = false;
-static bool play_button_held = false;
-
-static float play_button_angle_percentage = 0.0f; /* Increases by 5% every 60th of a second. This variable basically defines how rotated the play text angle is, relative to -5 degrees. */
-
-static SDL_FRect play_dstrect;
+static struct LE_Label play_label;
+static struct LE_RenderElement play_element;
+static struct LE_Button play_button;
 
 /*** Options Button/Text ***/
-static struct LE_Text options_text;
-static float options_text_angle = 0.f;
-
-static bool options_button_active = false;
-static bool options_button_held = false;
-static float options_button_angle_percentage = 0.0f; /* Refer to play_button_angle_percentage comment. */
-
-static SDL_FRect options_dstrect;
+static struct LE_Label options_label;
+static struct LE_RenderElement options_element;
+static struct LE_Button options_button;
 
 /*** Exit Button/Text ***/
-static struct LE_Text exit_text;
-static float exit_text_angle = 0.f;
-
-static bool exit_button_active = false;
-static bool exit_button_held = false;
-static float exit_button_angle_percentage = 0.0f; /* Refer to play_button_angle_percentage comment. */
-
-static SDL_FRect exit_dstrect;
-
-bool MainMenuInit(SDL_Renderer *pRenderer) {
-    renderer = pRenderer;
-
-    if (!LEGameFont) {
-        fprintf(stderr, "Trying to load text without loading the font!");
-        return false;
-    }
-
-    title_text.fg = (SDL_Color){ 255, 255, 255, SDL_ALPHA_OPAQUE };
-    title_text.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
-    title_text.text = SDL_malloc(256);
-    SDL_memcpy(title_text.text, "Lost in Transit", 16);
-    if (!UpdateText(&title_text)) {
-        return false;
-    }
-
-    title_dstrect.w = title_text.surface->w;
-    title_dstrect.h = title_text.surface->h;
-
-    play_text.fg = (SDL_Color){ 200, 140, 140, SDL_ALPHA_OPAQUE };
-    play_text.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
-    play_text.text = "Play!";
-    if (!UpdateText(&play_text)) {
-        return false;
-    }
-
-    play_dstrect.w = play_text.surface->w;
-    play_dstrect.h = play_text.surface->h;
-
-    options_text.fg = (SDL_Color){ 140, 200, 140, SDL_ALPHA_OPAQUE };
-    options_text.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
-    options_text.text = "Options";
-    if (!UpdateText(&options_text)) {
-        return false;
-    }
-
-    options_dstrect.w = options_text.surface->w;
-    options_dstrect.h = options_text.surface->h;
-
-    exit_text.fg = (SDL_Color){ 140, 140, 200, SDL_ALPHA_OPAQUE };
-    exit_text.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
-    exit_text.text = "Exit";
-    if (!UpdateText(&exit_text)) {
-        return false;
-    }
-
-    exit_dstrect.w = exit_text.surface->w;
-    exit_dstrect.h = exit_text.surface->h;
-
-    return true;
-}
-
-/* time elapsed since first render function (unused) */
-// static double total_time = 0.0;
-
-/* time elapsed since last fixed update, updates every single render step. */
-static double fixed_update_timer = 0.0;
+static struct LE_Label exit_label;
+static struct LE_RenderElement exit_element;
+static struct LE_Button exit_button;
 
 static inline void PlayButtonPressed() {
     LEScheduleLoadScene(SCENE_PLAY);
@@ -121,87 +48,105 @@ static inline void OptionsButtonPressed() {
     LEScheduleLoadScene(SCENE_OPTIONS);
 }
 
-bool MainMenuRender(const double * const delta) {
-    // total_time += *delta;
-    fixed_update_timer += *delta;
+bool MainMenuInit(SDL_Renderer *pRenderer) {
+    renderer = pRenderer;
 
-    play_dstrect.x = LEScreenWidth * 0.0225;
-    play_dstrect.y = LEScreenHeight * 0.25;
-    
-    options_dstrect.x = LEScreenWidth * 0.0225;
-    options_dstrect.y = SDL_max(LEScreenHeight * 0.35, play_dstrect.y + play_dstrect.h + 5);
-    
-    exit_dstrect.x = LEScreenWidth * 0.0225;
-    exit_dstrect.y = SDL_max(LEScreenHeight * 0.45, options_dstrect.y + options_dstrect.h + 5);
-
-    while (fixed_update_timer >= FIXED_UPDATE_TIME) {
-        float x, y;
-
-        SDL_MouseButtonFlags mouse_state = SDL_GetMouseState(&x, &y);
-        bool mouse1_held = mouse_state & SDL_BUTTON_LMASK;
-
-        /* Check for hovers, clicks, etc. Apply effects or run callbacks depending on the result. */
-        if (!activate_button_if_hovering(x, y,
-                                    mouse1_held, &play_text,
-                                    &play_dstrect, &play_button_active,
-                                    &play_button_held, PlayButtonPressed,
-                                    (SDL_Color){ 200, 140, 140, SDL_ALPHA_OPAQUE }))
-            return false;
-
-        /* Same thing as above but for options. */
-        if (!activate_button_if_hovering(x, y,
-                                    mouse1_held, &options_text,
-                                    &options_dstrect, &options_button_active,
-                                    &options_button_held, OptionsButtonPressed,
-                                    (SDL_Color){ 140, 200, 140, SDL_ALPHA_OPAQUE }))
-            return false;
-
-        /* Same thing as above but for exit. */
-        if (!activate_button_if_hovering(x, y,
-                                    mouse1_held, &exit_text,
-                                    &exit_dstrect, &exit_button_active,
-                                    &exit_button_held, NULL,
-                                    (SDL_Color){ 140, 140, 200, SDL_ALPHA_OPAQUE }))
-            return false;
-        
-        /* animate any buttons that are hovered */
-
-        if (play_button_active && play_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-            play_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!play_button_active && play_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-            play_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        }
-
-        if (options_button_active && options_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-            options_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!options_button_active && options_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-            options_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        }
-
-        if (exit_button_active && exit_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-            exit_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!exit_button_active && exit_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-            exit_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        }
-
-        play_text_angle = -smoothstep(0.f, 1.f, play_button_angle_percentage)*BUTTON_ANGLE_MAX;
-        options_text_angle = -smoothstep(0.f, 1.f, options_button_angle_percentage)*BUTTON_ANGLE_MAX;
-        exit_text_angle = -smoothstep(0.f, 1.f, exit_button_angle_percentage)*BUTTON_ANGLE_MAX;
-
-        fixed_update_timer -= FIXED_UPDATE_TIME;
+    if (!pLEGameFont) {
+        fprintf(stderr, "Trying to load text without loading the font!");
+        return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, play_text.texture, NULL, &play_dstrect, play_text_angle, NULL, SDL_FLIP_NONE)) {
+    title_label.fg = (SDL_Color){ 255, 255, 255, SDL_ALPHA_OPAQUE };
+    title_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    title_label.text = SDL_malloc(256);
+    SDL_memcpy(title_label.text, "Lost in Transit", 16);
+    if (!UpdateText(&title_label)) {
+        return false;
+    }
+    title_dstrect.w = title_label.surface->w;
+    title_dstrect.h = title_label.surface->h;
+
+    play_label.fg = (SDL_Color){ 200, 140, 140, SDL_ALPHA_OPAQUE };
+    play_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    play_label.text = "Play!";
+    if (!UpdateText(&play_label)) {
+        return false;
+    }
+
+    play_element.texture = &play_label.texture;
+    play_element.dstrect.w = play_label.surface->w;
+    play_element.dstrect.h = play_label.surface->h;
+
+    InitButton(&play_button);
+    play_button.element = &play_element;
+    play_button.on_button_pressed = PlayButtonPressed;
+
+    options_label.fg = (SDL_Color){ 140, 200, 140, SDL_ALPHA_OPAQUE };
+    options_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    options_label.text = "Options";
+    if (!UpdateText(&options_label)) {
+        return false;
+    }
+
+    options_element.texture = &options_label.texture;
+    options_element.dstrect.w = options_label.surface->w;
+    options_element.dstrect.h = options_label.surface->h;
+
+    InitButton(&options_button);
+    options_button.element = &options_element;
+    options_button.on_button_pressed = OptionsButtonPressed;
+
+    exit_label.fg = (SDL_Color){ 140, 140, 200, SDL_ALPHA_OPAQUE };
+    exit_label.bg = (SDL_Color){ 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    exit_label.text = "Exit";
+    if (!UpdateText(&exit_label)) {
+        return false;
+    }
+
+    exit_element.texture = &exit_label.texture;
+    exit_element.dstrect.w = exit_label.surface->w;
+    exit_element.dstrect.h = exit_label.surface->h;
+
+    InitButton(&exit_button);
+    exit_button.element = &exit_element;
+
+    return true;
+}
+
+bool MainMenuRender(void) {
+    play_element.dstrect.x = LEScreenWidth * 0.0225;
+    play_element.dstrect.y = LEScreenHeight * 0.25;
+    
+    options_element.dstrect.x = LEScreenWidth * 0.0225;
+    options_element.dstrect.y = SDL_max(LEScreenHeight * 0.35, play_element.dstrect.y + play_element.dstrect.h + 5);
+    
+    exit_element.dstrect.x = LEScreenWidth * 0.0225;
+    exit_element.dstrect.y = SDL_max(LEScreenHeight * 0.45, options_element.dstrect.y + options_element.dstrect.h + 5);
+
+    struct MouseInfo mouse_info;
+    mouse_info.state = SDL_GetMouseState(&mouse_info.x, &mouse_info.y);
+
+    if (!ButtonStep(&play_button, &mouse_info, &LEFrametime)) {
+        return false;
+    }
+    if (!ButtonStep(&options_button, &mouse_info, &LEFrametime)) {
+        return false;
+    }
+    if (!ButtonStep(&exit_button, &mouse_info, &LEFrametime)) {
+        return false;
+    }
+
+    if (!SDL_RenderTextureRotated(renderer, play_element.texture, NULL, &play_element.dstrect, play_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Play button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, options_text.texture, NULL, &options_dstrect, options_text_angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, options_element.texture, NULL, &options_element.dstrect, options_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Options button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, exit_text.texture, NULL, &exit_dstrect, exit_text_angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, exit_element.texture, NULL, &exit_element.dstrect, exit_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Exit button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
@@ -209,7 +154,7 @@ bool MainMenuRender(const double * const delta) {
     title_dstrect.x = LEScreenWidth * 0.0125;
     title_dstrect.y = LEScreenHeight * 0.0125;
 
-    if (!SDL_RenderTexture(renderer, title_text.texture, NULL, &title_dstrect)) {
+    if (!SDL_RenderTexture(renderer, title_label.texture, NULL, &title_dstrect)) {
         fprintf(stderr, "Failed to draw the game title! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
@@ -218,8 +163,8 @@ bool MainMenuRender(const double * const delta) {
 }
 
 void MainMenuCleanup(void) {
-    DestroyText(&title_text);
-    DestroyText(&play_text);
-    DestroyText(&options_text);
-    DestroyText(&exit_text);
+    DestroyText(&title_label);
+    DestroyText(&play_label);
+    DestroyText(&options_label);
+    DestroyText(&exit_label);
 }

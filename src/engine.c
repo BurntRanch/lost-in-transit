@@ -2,6 +2,7 @@
 
 #include "engine.h"
 #include "scenes.h"
+#include "label.h"
 
 #include "scenes/main_menu.h"
 #include "scenes/options.h"
@@ -29,7 +30,7 @@
 #include <stdio.h>
 #include <time.h>
 
-TTF_Font *LEGameFont = NULL;
+TTF_Font *pLEGameFont = NULL;
 
 int LEScreenWidth, LEScreenHeight;
 
@@ -87,7 +88,7 @@ bool LEInitSteam(void) {
     return SRInitGNS();
 }
 
-void DestroyText(struct LE_Text * const pLEText) {
+void DestroyText(struct LE_Label * const pLEText) {
     if (pLEText->texture) {
         SDL_DestroyTexture(pLEText->texture);
         pLEText->texture = NULL;
@@ -99,10 +100,10 @@ void DestroyText(struct LE_Text * const pLEText) {
     }
 }
 
-bool UpdateText(struct LE_Text * const pLEText) {
+bool UpdateText(struct LE_Label * const pLEText) {
     DestroyText(pLEText);
 
-    if (!(pLEText->surface = TTF_RenderText_Shaded_Wrapped(LEGameFont, pLEText->text, 0, pLEText->fg, pLEText->bg, 0))) {
+    if (!(pLEText->surface = TTF_RenderText_Shaded_Wrapped(pLEGameFont, pLEText->text, 0, pLEText->fg, pLEText->bg, 0))) {
         fprintf(stderr, "Failed to render text! (text: %s) (SDL Error Code: %s)\n", pLEText->text, SDL_GetError());
         return false;
     }
@@ -165,7 +166,7 @@ void LEScheduleLoadScene(const Uint8 scene) {
     scene_to_load = scene;
 }
 
-void LECleanupScene() {
+void LECleanupScene(void) {
     switch (scene_loaded) {
     case SCENE_MAINMENU:
         MainMenuCleanup();
@@ -189,9 +190,10 @@ void LECleanupScene() {
 
 static Uint64 last_frame_time;
 static Uint64 now;
-static double frametime;
 
-bool LEStepRender(double *pFrametime) {
+double LEFrametime = 0.0;
+
+bool LEStepRender(void) {
     now = SDL_GetTicksNS();
 
     SDL_Event event;
@@ -224,27 +226,27 @@ bool LEStepRender(double *pFrametime) {
     /* call the right render function for whatever scene we're running right now */
     switch (scene_loaded) {
     case SCENE_MAINMENU:
-        if (!MainMenuRender(&frametime)) {
+        if (!MainMenuRender()) {
             return false;
         }
         break;
     case SCENE_OPTIONS:
-        if (!OptionsRender(&frametime)) {
+        if (!OptionsRender()) {
             return false;
         }
         break;
     case SCENE_PLAY:
-        if (!PlayRender(&frametime)) {
+        if (!PlayRender()) {
             return false;
         }
         break;
     case SCENE_HOST:
-        if (!HostRender(&frametime)) {
+        if (!HostRender()) {
             return false;
         }
         break;
     case SCENE_CONNECT:
-        if (!ConnectRender(&frametime)) {
+        if (!ConnectRender()) {
             return false;
         }
         break;
@@ -254,10 +256,7 @@ bool LEStepRender(double *pFrametime) {
 
     SDL_RenderPresent(renderer);
     
-    frametime = (now - last_frame_time) / 1000000000.0;
-    if (pFrametime) {
-        *pFrametime = frametime;
-    }
+    LEFrametime = (now - last_frame_time) / 1000000000.0;
 
     last_frame_time = now;
 

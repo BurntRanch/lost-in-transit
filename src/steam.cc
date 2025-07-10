@@ -149,13 +149,13 @@ void SRStopServer(void) {
     server_listen_socket = k_HSteamListenSocket_Invalid;
 }
 
-static bool ConnectToServer(const SteamNetworkingIPAddr * const address) {
+static bool ConnectToServer(const SteamNetworkingIPAddr * const pAddress) {
     if (client_connection != k_HSteamNetConnection_Invalid) {
         fprintf(stderr, "Already connected to a server!\n");
         return false;
     }
 
-    if ((client_connection = SteamNetworkingSockets()->ConnectByIPAddress(*address, 1, &client_config) == k_HSteamNetConnection_Invalid)) {
+    if ((client_connection = SteamNetworkingSockets()->ConnectByIPAddress(*pAddress, 1, &client_config) == k_HSteamNetConnection_Invalid)) {
         fprintf(stderr, "Failed to connect to server!\n");
         return false;
     }
@@ -171,15 +171,15 @@ bool SRConnectToServerIPv4(Uint32 ipv4, Uint16 port) {
     return ConnectToServer(&ipAddr);
 }
 
-bool SRConnectToServerIPv6(Uint8 *ipv6, Uint16 port) {
+bool SRConnectToServerIPv6(Uint8 *pIPv6, Uint16 port) {
     SteamNetworkingIPAddr ipAddr;
     ipAddr.Clear();
-    ipAddr.SetIPv6(ipv6, port);
+    ipAddr.SetIPv6(pIPv6, port);
 
     return ConnectToServer(&ipAddr);
 }
 
-void SRDisconnectFromServer() {
+void SRDisconnectFromServer(void) {
     if (client_connection) {
         /* TODO: send goodbye message */
         SteamNetworkingSockets()->CloseConnection(client_connection, 0, "Disconnecting", true);

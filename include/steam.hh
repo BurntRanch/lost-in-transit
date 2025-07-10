@@ -23,9 +23,9 @@ extern "C" {
     void SRStopServer(void);
 
     bool SRConnectToServerIPv4(Uint32 ipv4, Uint16 port);
-    bool SRConnectToServerIPv6(Uint8 *ipv6, Uint16 port);
+    bool SRConnectToServerIPv6(Uint8 *pIPv6, Uint16 port);
 
-    void SRDisconnectFromServer();
+    void SRDisconnectFromServer(void);
 
     /* poll both server & client connections, return true on success */
     bool SRPollConnections(void);

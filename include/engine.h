@@ -6,19 +6,11 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include <stdbool.h>
 
-extern TTF_Font *LEGameFont;
+extern TTF_Font *pLEGameFont;
 
 extern int LEScreenWidth, LEScreenHeight;
 
-struct LE_Text {
-    /* The surface, usually created through functions like `TTF_RenderText_Shaded_Wrapped`. */
-    SDL_Surface *surface;
-    /* The texture, required to render. Just use SDL_CreateTextureFromSurface and all will go well! */
-    SDL_Texture *texture;
-
-    char *text;
-    SDL_Color fg, bg;
-};
+extern double LEFrametime;
 
 /* Returns true on success. */
 bool LEInitWindow(void);
@@ -27,22 +19,6 @@ bool LEInitTTF(void);
 
 /* So far, only initializes GameNetworkingSockets. This will change to initialize the full Steam API. (once I actually get my hands on it) */
 bool LEInitSteam(void);
-
-/* Free all resources related to an LE_Text struct 
- *
- * You can not render the LE_Text struct anymore, but you can run UpdateText on it again.
- */
-void DestroyText(struct LE_Text * const pLEText);
-
-/* Re-render an LE_Text struct with new text. 
-
- * Can be called even when the struct has not been rendered before.
-
- * Where do I set the text, or the fg/bg color? They're all in the struct, Set them before calling this function. 
-
- * Returns true on success.
- */
-bool UpdateText(struct LE_Text * const pLEText);
 
 /* Loads a scene **immediately**, This is not safe to run multi-threaded or inside of a scenes render function. Consider calling LEScheduleLoadScene for that purpose instead.
  * Refer to scenes.h
@@ -63,11 +39,11 @@ void LEScheduleLoadScene(const Uint8 scene);
 
 /* Render the current game state.
  *
- * Sets [frametime] to the frametime in seconds. If this is null, well, frametime data will go nowhere.
+ * Sets [LEFrametime] to the frametime in seconds.
  *
  * Returns false if the window is not initialized, something went wrong, or the user requested to exit (pressing escape).
  */
-bool LEStepRender(double *pFrameTime);
+bool LEStepRender(void);
 
 /* Destroy the window. */
 void LEDestroyWindow(void);

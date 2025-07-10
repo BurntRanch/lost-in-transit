@@ -1,5 +1,7 @@
+#include "button.h"
 #include "common.h"
 #include "engine.h"
+#include "label.h"
 #include "scenes.h"
 #include "steam.hh"
 
@@ -21,78 +23,16 @@ static char *ip = NULL;
 
 static SDL_Renderer *renderer = NULL;
 
-static struct SDL_Texture *back_texture = NULL;
+static struct LE_RenderElement back_element;
+static struct LE_Button back_button;
 
-static bool back_button_active = false;
-static bool back_button_held = false;
-
-static float back_button_angle_percentage = 0.0f;
-static float back_button_angle = 0.0f;
-
-static struct SDL_FRect back_dstrect = { 0, 0, 0, 0 };
-
-
-
-static struct LE_Text ip_text;
-
+static struct LE_Label ip_label;
 static struct SDL_FRect ip_dstrect;
 
+static struct LE_RenderElement copy_element;
+static struct LE_Button copy_button;
 
-
-static struct SDL_Texture *copy_texture = NULL;
-
-static bool copy_button_active = false;
-static bool copy_button_held = false;
-
-static float copy_button_angle_percentage = 0.0f;
-static float copy_button_angle = 0.0f;
-
-static struct SDL_FRect copy_dstrect = { 0, 0, 0, 0 };
-
-bool HostInit(SDL_Renderer *pRenderer) {
-    renderer = pRenderer;
-
-    if (!(back_texture = IMG_LoadTexture(renderer, "images/back.png"))) {
-        fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
-        return false;
-    }
-    back_dstrect.w = back_texture->w;
-    back_dstrect.h = back_texture->h;
-
-    if (!(copy_texture = IMG_LoadTexture(renderer, "images/copy.png"))) {
-        fprintf(stderr, "Failed to load 'images/copy.png'! (SDL Error Code: %s)\n", SDL_GetError());
-        return false;
-    }
-
-    ip = NULL;
-    if (!(ip = SRStartServer(63288))) {
-        return false;
-    }
-
-    ip_text.text = malloc(256);
-    ip_text.text[0] = '\0';
-    strncat(ip_text.text, "IP: ", 5);
-    strncat(ip_text.text, ip, 128);
-
-    ip_text.fg = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
-    ip_text.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
-    if (!UpdateText(&ip_text)) {
-        return false;
-    }
-    ip_dstrect.w = ip_text.surface->w;
-    ip_dstrect.h = ip_text.surface->h;
-
-    /* Set the little copy button to be as big as the text. */
-    copy_dstrect.h = ip_dstrect.h;
-    copy_dstrect.w = copy_dstrect.h; /* Aspect ratio is always 1:1 (128x128) for the image, So we just set the width to the height of the text */
-
-    return true;
-}
-
-/* time elapsed since last fixed update, updates every single render step. */
-static double fixed_update_timer = 0.0;
-
-/* Should we apply the "copied" status effect? */
+/* Should we apply the "copied" status effect? (makes the button green) */
 static bool copy_button_apply_effect = false;
 
 static inline void CopyButtonPressed() {
@@ -104,79 +44,100 @@ static inline void BackButtonPressed() {
     LEScheduleLoadScene(SCENE_PLAY);
 }
 
-bool HostRender(const double * const delta) {
-    fixed_update_timer += *delta;
+bool HostInit(SDL_Renderer *pRenderer) {
+    renderer = pRenderer;
 
-    back_dstrect.x = LEScreenWidth * 0.0125;
-    back_dstrect.y = LEScreenHeight * 0.0125;
+    if (!(back_element.texture = IMG_LoadTexture(renderer, "images/back.png"))) {
+        fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
+    }
+    back_element.dstrect.w = ((SDL_Texture *)back_element.texture)->w;
+    back_element.dstrect.h = ((SDL_Texture *)back_element.texture)->h;
 
-    ip_dstrect.x = LEScreenWidth * 0.0125;
-    ip_dstrect.y = back_dstrect.h + back_dstrect.y;
-    
-    copy_dstrect.x = ip_dstrect.w + ip_dstrect.x;
-    copy_dstrect.y = ip_dstrect.y;
+    InitButton(&back_button);
+    back_button.max_angle = 10.0f;
+    back_button.on_button_pressed = BackButtonPressed;
+    back_button.element = &back_element;
 
-    while (fixed_update_timer >= FIXED_UPDATE_TIME) {
-        float x, y;
-
-        SDL_MouseButtonFlags mouse_state = SDL_GetMouseState(&x, &y);
-        bool mouse1_held = mouse_state & SDL_BUTTON_LMASK;
-
-        if (!activate_button_if_hovering(x, y, 
-                                        mouse1_held, NULL,
-                                        &back_dstrect,
-                                        &back_button_active, &back_button_held, BackButtonPressed,
-                                        (SDL_Color) {0,0,0,0} ))
-            return false;
-
-        if (!activate_button_if_hovering(x, y, 
-                                        mouse1_held, NULL,
-                                        &copy_dstrect,
-                                        &copy_button_active, &copy_button_held, CopyButtonPressed,
-                                        (SDL_Color) {0,0,0,0} ))
-            return false;
-        
-        if (back_button_active && back_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-            back_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!back_button_active && back_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-            back_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        }
-        
-        if (copy_button_active && copy_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-            copy_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!copy_button_active && copy_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-            copy_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        }
-
-        back_button_angle = -smoothstep(0.f, 1.f, back_button_angle_percentage)*10;
-        copy_button_angle = -smoothstep(0.f, 1.f, copy_button_angle_percentage)*10;
-
-        fixed_update_timer -= FIXED_UPDATE_TIME;
+    if (!(copy_element.texture = IMG_LoadTexture(renderer, "images/copy.png"))) {
+        fprintf(stderr, "Failed to load 'images/copy.png'! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
     }
 
-    if (!SDL_RenderTexture(renderer, ip_text.texture, NULL, &ip_dstrect)) {
+    InitButton(&copy_button);
+    copy_button.max_angle = 10.0f;
+    copy_button.on_button_pressed = CopyButtonPressed;
+    copy_button.element = &copy_element;
+
+    ip = NULL;
+    if (!(ip = SRStartServer(63288))) {
+        return false;
+    }
+
+    ip_label.text = malloc(256);
+    ip_label.text[0] = '\0';
+    strncat(ip_label.text, "IP: ", 5);
+    strncat(ip_label.text, ip, 128);
+
+    ip_label.fg = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
+    ip_label.bg = (SDL_Color) { 0, 0, 0, SDL_ALPHA_TRANSPARENT };
+    if (!UpdateText(&ip_label)) {
+        return false;
+    }
+    ip_dstrect.w = ip_label.surface->w;
+    ip_dstrect.h = ip_label.surface->h;
+
+    /* Set the little copy button to be as big as the text. */
+    copy_element.dstrect.h = ip_dstrect.h;
+    copy_element.dstrect.w = copy_element.dstrect.h; /* Aspect ratio is always 1:1 (128x128) for the image, So we just set the width to the height of the text */
+
+    return true;
+}
+
+bool HostRender(void) {
+    back_element.dstrect.x = LEScreenWidth * 0.0125;
+    back_element.dstrect.y = LEScreenHeight * 0.0125;
+
+    ip_dstrect.x = LEScreenWidth * 0.0125;
+    ip_dstrect.y = back_element.dstrect.h + back_element.dstrect.y;
+    
+    copy_element.dstrect.x = ip_dstrect.w + ip_dstrect.x;
+    copy_element.dstrect.y = ip_dstrect.y;
+
+    struct MouseInfo mouse_info;
+    mouse_info.state = SDL_GetMouseState(&mouse_info.x, &mouse_info.y);
+    
+    if (!ButtonStep(&back_button, &mouse_info, &LEFrametime)) {
+        return false;
+    }
+
+    if (!ButtonStep(&copy_button, &mouse_info, &LEFrametime)) {
+        return false;
+    }
+
+    if (!SDL_RenderTexture(renderer, ip_label.texture, NULL, &ip_dstrect)) {
         fprintf(stderr, "Failed to render IP text! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, back_texture, NULL, &back_dstrect, back_button_angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, back_element.texture, NULL, &back_element.dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render back button! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
     if (copy_button_apply_effect) {
-        if (!SDL_SetTextureColorMod(copy_texture, 20, 235, 20)) {
+        if (!SDL_SetTextureColorMod(copy_element.texture, 20, 235, 20)) {
             fprintf(stderr, "Failed to set texture color modulation! (SDL Error: %s)\n", SDL_GetError());
             return false;
         }
     } else {
-        if (!SDL_SetTextureColorMod(copy_texture, 255, 255, 255)) {
+        if (!SDL_SetTextureColorMod(copy_element.texture, 255, 255, 255)) {
             fprintf(stderr, "Failed to set texture color modulation! (SDL Error: %s)\n", SDL_GetError());
             return false;
         }
     }
 
-    if (!SDL_RenderTextureRotated(renderer, copy_texture, NULL, &copy_dstrect, copy_button_angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, copy_element.texture, NULL, &copy_element.dstrect, copy_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render copy button! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
@@ -185,12 +146,12 @@ bool HostRender(const double * const delta) {
 }
 
 void HostCleanup(void) {
-    DestroyText(&ip_text);
-    free(ip_text.text);
+    DestroyText(&ip_label);
+    free(ip_label.text);
     free(ip);
 
-    SDL_DestroyTexture(back_texture);
-    SDL_DestroyTexture(copy_texture);
+    SDL_DestroyTexture(back_element.texture);
+    SDL_DestroyTexture(copy_element.texture);
 
     SRStopServer();
 }

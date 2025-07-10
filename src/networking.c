@@ -8,32 +8,32 @@ static void (*server_connect_callback)(const ConnectionHandle) = NULL;
 static void (*client_disconnect_callback)(const ConnectionHandle, const char * const) = NULL;
 static void (*client_connect_callback)(const ConnectionHandle) = NULL;
 
-void NETSetServerDisconnectCallback(void (*callback)(const ConnectionHandle, const char * const)) {
-    server_disconnect_callback = callback;
+void NETSetServerDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char * const)) {
+    server_disconnect_callback = pCallback;
 }
-void NETSetServerConnectCallback(void (*callback)(const ConnectionHandle)) {
-    server_connect_callback = callback;
-}
-
-void NETSetClientDisconnectCallback(void (*callback)(const ConnectionHandle, const char * const)) {
-    client_disconnect_callback = callback;
-}
-void NETSetClientConnectCallback(void (*callback)(const ConnectionHandle)) {
-    client_connect_callback = callback;
+void NETSetServerConnectCallback(void (*pCallback)(const ConnectionHandle)) {
+    server_connect_callback = pCallback;
 }
 
-void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const message) {
+void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char * const)) {
+    client_disconnect_callback = pCallback;
+}
+void NETSetClientConnectCallback(void (*pCallback)(const ConnectionHandle)) {
+    client_connect_callback = pCallback;
+}
+
+void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const pMessage) {
     if (role == NET_ROLE_SERVER) {
-        fprintf(stderr, "Client (%d) is disconnecting! %s\n", handle, message ? message : "");
+        fprintf(stderr, "Client (%d) is disconnecting! %s\n", handle, pMessage ? pMessage : "");
         
         if (server_disconnect_callback) {
-            server_disconnect_callback(handle, message);
+            server_disconnect_callback(handle, pMessage);
         }
     } else {
-        fprintf(stderr, "Disconnecting from server (%d)! %s\n", handle, message ? message : "");
+        fprintf(stderr, "Disconnecting from server (%d)! %s\n", handle, pMessage ? pMessage : "");
 
         if (client_disconnect_callback) {
-            client_disconnect_callback(handle, message);
+            client_disconnect_callback(handle, pMessage);
         }
     }
 }
@@ -54,10 +54,10 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle) {
     }
 }
 
-void NETHandleConnectionFailure(const char * const reason) {
-    fprintf(stderr, "Failed to connect to server! (reason: %s)\n", reason ? reason : "unexpected error");
+void NETHandleConnectionFailure(const char * const pReason) {
+    fprintf(stderr, "Failed to connect to server! (reason: %s)\n", pReason ? pReason : "unexpected error");
 
     if (client_disconnect_callback) {
-        client_disconnect_callback(0, reason);
+        client_disconnect_callback(0, pReason);
     }
 }

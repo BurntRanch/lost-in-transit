@@ -1,6 +1,8 @@
 #include "scenes/connect.h"
+#include "button.h"
 #include "common.h"
 #include "engine.h"
+#include "label.h"
 #include "networking.h"
 #include "scenes.h"
 #include "steam.hh"
@@ -16,20 +18,10 @@
 
 static SDL_Renderer *renderer = NULL;
 
-static struct SDL_Texture *back_texture = NULL;
+static struct LE_RenderElement back_element;
+static struct LE_Button back_button;
 
-static bool back_button_active = false;
-static bool back_button_held = false;
-
-static float back_button_angle_percentage = 0.0f;
-static float back_button_angle = 0.0f;
-
-static struct SDL_FRect back_dstrect = { 0, 0, 0, 0 };
-
-
-
-static struct LE_Text connection_status_label;
-
+static struct LE_Label connection_status_label;
 static struct SDL_FRect connection_status_dstrect;
 
 static bool started = false;
@@ -43,12 +35,12 @@ static void SetConnectionStatusConnected(const ConnectionHandle _) {
     connection_status_dstrect.w = connection_status_label.surface->w;
     connection_status_dstrect.h = connection_status_label.surface->h;
 }
-static void SetConnectionStatusDisconnected(const ConnectionHandle handle, const char * const reason) {
-    if (reason) {
-        size_t reason_size = SDL_strlen(reason) + 1;
+static void SetConnectionStatusDisconnected(const ConnectionHandle handle, const char * const pReason) {
+    if (pReason) {
+        size_t reason_size = SDL_strlen(pReason) + 1;
 
         connection_status_label.text = SDL_malloc(reason_size);
-        SDL_memcpy(connection_status_label.text, reason, reason_size);
+        SDL_memcpy(connection_status_label.text, pReason, reason_size);
     } else if (handle == 0) {
         connection_status_label.text = "Disconnected (unexpected error)";
     } else {
@@ -62,16 +54,25 @@ static void SetConnectionStatusDisconnected(const ConnectionHandle handle, const
     connection_status_dstrect.h = connection_status_label.surface->h;
 }
 
+static void BackButtonPressed() {
+    LEScheduleLoadScene(SCENE_PLAY);
+}
+
 bool ConnectInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
     started = false;
 
-    if (!(back_texture = IMG_LoadTexture(renderer, "images/back.png"))) {
+    if (!(back_element.texture = IMG_LoadTexture(renderer, "images/back.png"))) {
         fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    back_dstrect.w = back_texture->w;
-    back_dstrect.h = back_texture->h;
+    back_element.dstrect.w = ((SDL_Texture *)(back_element.texture))->w;
+    back_element.dstrect.h = ((SDL_Texture *)(back_element.texture))->h;
+
+    InitButton(&back_button);
+    back_button.max_angle = 10.0f;
+    back_button.on_button_pressed = BackButtonPressed;
+    back_button.element = &back_element;
 
     connection_status_label.text = "Connecting..";
     connection_status_label.fg = (SDL_Color) { 200, 200, 200, SDL_ALPHA_OPAQUE };
@@ -88,15 +89,7 @@ bool ConnectInit(SDL_Renderer *pRenderer) {
     return true;
 }
 
-static float fixed_update_timer = 0.0;
-
-static void BackButtonPressed() {
-    LEScheduleLoadScene(SCENE_PLAY);
-}
-
-bool ConnectRender(const double * const delta) {
-    fixed_update_timer += *delta;
-
+bool ConnectRender(void) {
     if (!started) {
         started = true;
 
@@ -106,40 +99,23 @@ bool ConnectRender(const double * const delta) {
         }
     }
 
-    back_dstrect.x = LEScreenWidth * 0.0125;
-    back_dstrect.y = LEScreenHeight * 0.0125;
+    back_button.element->dstrect.x = LEScreenWidth * 0.0125;
+    back_button.element->dstrect.y = LEScreenHeight * 0.0125;
 
-    while (fixed_update_timer >= FIXED_UPDATE_TIME) {
-        float x, y;
+    struct MouseInfo mouse_info;
+    mouse_info.state = SDL_GetMouseState(&mouse_info.x, &mouse_info.y);
 
-        SDL_MouseButtonFlags mouse_state = SDL_GetMouseState(&x, &y);
-        bool mouse1_held = mouse_state & SDL_BUTTON_LMASK;
-
-        if (!activate_button_if_hovering(x, y, 
-                                        mouse1_held, NULL,
-                                        &back_dstrect,
-                                        &back_button_active, &back_button_held, BackButtonPressed,
-                                        (SDL_Color) {0,0,0,0} ))
-            return false;
-        
-        if (back_button_active && back_button_angle_percentage <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-            back_button_angle_percentage += BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        } else if (!back_button_active && back_button_angle_percentage >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-            back_button_angle_percentage -= BUTTON_ANGLE_PERCENTAGE_INCREMENT;
-        }
-
-        back_button_angle = -smoothstep(0.f, 1.f, back_button_angle_percentage)*10;
-
-        fixed_update_timer -= FIXED_UPDATE_TIME;
+    if (!ButtonStep(&back_button, &mouse_info, &LEFrametime)) {
+        return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, back_texture, NULL, &back_dstrect, back_button_angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, back_element.texture, NULL, &back_button.element->dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render back button! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
     connection_status_dstrect.x = LEScreenWidth * 0.0125;
-    connection_status_dstrect.y = SDL_max(LEScreenHeight * 0.025, back_dstrect.y + back_dstrect.h);
+    connection_status_dstrect.y = SDL_max(LEScreenHeight * 0.025, back_button.element->dstrect.y + back_button.element->dstrect.h);
 
     if (!SDL_RenderTexture(renderer, connection_status_label.texture, NULL, &connection_status_dstrect)) {
         fprintf(stderr, "Failed to render connection status! (SDL Error: %s)\n", SDL_GetError());

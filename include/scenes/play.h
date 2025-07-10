@@ -11,7 +11,7 @@ bool PlayInit(SDL_Renderer *pRenderer);
 /* Render the play menu.
  * Returns true if all went well.
  */
-bool PlayRender(const double * const delta);
+bool PlayRender(void);
 
 /* Clean everything up. */
 void PlayCleanup(void);
