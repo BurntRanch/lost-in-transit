@@ -127,11 +127,6 @@ static inline void FreeList(struct PlayersLinkedList *list) {
     if (list->next)
         list->next->prev = list->prev;
 
-    /* if we are about to free the server_players list, set it to NULL to avoid leaving a dangling pointer behind. */
-    if (list == server_players) {
-        server_players = list->next;
-    }
-
     free(list);
 }
 
@@ -178,7 +173,14 @@ void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const vo
 }
 
 void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const pMessage) {
-    FreeList(FindPlayerByHandle(server_players, handle));
+    struct PlayersLinkedList *player_list = FindPlayerByHandle(server_players, handle);
+
+    /* Make sure we don't leave behind a dangling pointer */
+    if (server_players == player_list && player_list) {
+        server_players = player_list->next;
+    }
+
+    FreeList(player_list);
 
     switch (role) {
         case NET_ROLE_SERVER:
