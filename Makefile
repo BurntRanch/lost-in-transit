@@ -30,6 +30,7 @@ LDFLAGS   	+= -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
 CFLAGS        += -fvisibility=hidden -Iinclude -I/usr/local/include/GameNetworkingSockets $(VARS) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	= $(CFLAGS)
+CFLAGS += --std=c23
 
 all: $(TARGET)
 $(TARGET): $(OBJ)

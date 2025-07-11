@@ -2,6 +2,7 @@
 #include "networking.h"
 #include "steam/isteamnetworkingsockets.h"
 #include "steam/steamclientpublic.h"
+#include "steam/steamtypes.h"
 
 #include <SDL3/SDL_stdinc.h>
 #include <algorithm>
@@ -33,7 +34,7 @@ static void Server_NetConnectionStatusChanged(SteamNetConnectionStatusChangedCal
         case k_ESteamNetworkingConnectionState_ClosedByPeer:
             /* connections that were never accepted don't matter to us */
             if (pInfo->m_eOldState == k_ESteamNetworkingConnectionState_Connected) {
-                NETHandleDisconnect(NET_ROLE_SERVER, pInfo->m_hConn, NULL);
+                NETHandleDisconnect(NET_ROLE_SERVER, pInfo->m_hConn, pInfo->m_info.m_szEndDebug);
 
                 auto it = std::find(server_clients.begin(), server_clients.end(), pInfo->m_hConn);
                 if (it != server_clients.end()) {
@@ -136,6 +137,31 @@ char *SRStartServer(Uint16 port) {
     return ip_addr_str;
 }
 
+bool SRSendMessageToClients(void *data, const int size) {
+    std::vector<SteamNetworkingMessage_t *> messages(server_clients.size());
+    std::vector<int64> results(server_clients.size());
+    
+    for (size_t i = 0; i < server_clients.size(); i++) {
+        messages[i] = SteamNetworkingUtils()->AllocateMessage(size);
+        memcpy(messages[i]->m_pData, data, size);
+
+        messages[i]->m_conn = server_clients[i];
+    }
+
+    SteamNetworkingSockets()->SendMessages(messages.size(), messages.data(), results.data());
+
+    /* Is there any error? */
+    if (std::any_of(results.begin(), results.end(), [] (int64 &result) { return result < 0; })) {
+        return false;
+    }
+
+    return true;
+}
+
+void SRDisconnectClient(const ConnectionHandle handle, const char * pReason) {
+    SteamNetworkingSockets()->CloseConnection(handle, 0, pReason, true);
+}
+
 void SRStopServer(void) {
     for (const HSteamNetConnection &conn : server_clients) {
         SteamNetworkingSockets()->CloseConnection(conn, 0, "Server shutting down", true);
@@ -155,7 +181,7 @@ static bool ConnectToServer(const SteamNetworkingIPAddr * const pAddress) {
         return false;
     }
 
-    if ((client_connection = SteamNetworkingSockets()->ConnectByIPAddress(*pAddress, 1, &client_config) == k_HSteamNetConnection_Invalid)) {
+    if ((client_connection = SteamNetworkingSockets()->ConnectByIPAddress(*pAddress, 1, &client_config)) == k_HSteamNetConnection_Invalid) {
         fprintf(stderr, "Failed to connect to server!\n");
         return false;
     }
@@ -180,11 +206,24 @@ bool SRConnectToServerIPv6(Uint8 *pIPv6, Uint16 port) {
 }
 
 void SRDisconnectFromServer(void) {
-    if (client_connection) {
-        /* TODO: send goodbye message */
-        SteamNetworkingSockets()->CloseConnection(client_connection, 0, "Disconnecting", true);
+    if (client_connection != k_HSteamNetConnection_Invalid) {
+        SteamNetworkingSockets()->CloseConnection(client_connection, 0, "Client Disconnect", true);
         client_connection = k_HSteamNetConnection_Invalid;
     }
+
+    NETSetClientConnectCallback(NULL);
+    NETSetClientDisconnectCallback(NULL);
+}
+
+bool SRSendToConnection(const ConnectionHandle handle, const void * const data, const size_t size) {
+    EResult send_result = SteamNetworkingSockets()->SendMessageToConnection(handle, data, size, k_nSteamNetworkingSend_Reliable, NULL);
+    if (send_result != k_EResultOK) {
+        fprintf(stderr, "Failed to send message! (Steam Error Code: %d)\n", send_result);
+
+        return false;
+    }
+
+    return true;
 }
 
 bool SRPollConnections(void) {
@@ -200,7 +239,25 @@ bool SRPollConnections(void) {
         for (int i = 0; i < msgCount; i++) {
             SteamNetworkingMessage_t *message = &messages[i];
 
-            /* TODO: do something */
+            NETHandleData(NET_ROLE_SERVER, message->GetConnection(), message->GetData(), message->GetSize());
+
+            message->Release();
+        }
+    }
+
+    if (client_connection != k_HSteamNetConnection_Invalid) {
+        SteamNetworkingMessage_t *messages = nullptr;
+        int msgCount = SteamNetworkingSockets()->ReceiveMessagesOnConnection(client_connection, &messages, 5);
+
+        if (msgCount < -1) {
+            fprintf(stderr, "Failed to receive messages from client connection!\n");
+            return false;
+        }
+
+        for (int i = 0; i < msgCount; i++) {
+            SteamNetworkingMessage_t *message = &messages[i];
+
+            NETHandleData(NET_ROLE_CLIENT, message->GetConnection(), message->GetData(), message->GetSize());
 
             message->Release();
         }

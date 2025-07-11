@@ -122,12 +122,10 @@ bool PlayRender(void) {
         fprintf(stderr, "Failed to render back button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-
     if (!SDL_RenderTextureRotated(renderer, *host_element.texture, NULL, &host_element.dstrect, host_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render host button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-
     if (!SDL_RenderTextureRotated(renderer, *connect_element.texture, NULL, &connect_element.dstrect, connect_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render connect button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;

@@ -2,3 +2,4 @@
 -I/usr/local/include/GameNetworkingSockets
 -Wall
 -Wextra
+-Wno-c23-extensions
