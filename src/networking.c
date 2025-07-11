@@ -75,9 +75,29 @@ static inline void ConnectLinkedLists(struct PlayersLinkedList *first, struct Pl
     second->prev = first;
 }
 
-static inline bool IDExistsInList(struct PlayersLinkedList *list, const int id) {
+static inline struct PlayersLinkedList *FindPlayerByHandle(struct PlayersLinkedList *list, const ConnectionHandle handle) {
     if (!list) {
-        return false;
+        return NULL;
+    }
+
+    while (list->prev != NULL) {
+        list = list->prev;
+    }
+
+    while (list != NULL) {
+        if (list->this.handle == handle) {
+            return list;
+        }
+
+        list = list->next;
+    }
+
+    return NULL;
+}
+
+static inline struct PlayersLinkedList *FindPlayerByID(struct PlayersLinkedList *list, const int id) {
+    if (!list) {
+        return NULL;
     }
 
     while (list->prev != NULL) {
@@ -86,17 +106,37 @@ static inline bool IDExistsInList(struct PlayersLinkedList *list, const int id) 
 
     while (list != NULL) {
         if (list->this.id == id) {
-            return true;
+            return list;
         }
 
         list = list->next;
     }
 
-    return false;
+    return NULL;
+}
+
+/* Frees a single list item. Doesn't free any other siblings */
+static inline void FreeList(struct PlayersLinkedList *list) {
+    if (!list) {
+        return;
+    }
+
+    if (list->prev)
+        list->prev->next = list->next;
+
+    if (list->next)
+        list->next->prev = list->prev;
+
+    /* if we are about to free the server_players list, set it to NULL to avoid leaving a dangling pointer behind. */
+    if (list == server_players) {
+        server_players = list->next;
+    }
+
+    free(list);
 }
 
 /* Frees the list and any other siblings. */
-static inline void FreePlayersLinkedList(struct PlayersLinkedList * list) {
+static inline void FreeLists(struct PlayersLinkedList * list) {
     if (!list) {
         return;
     }
@@ -138,6 +178,8 @@ void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const vo
 }
 
 void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const pMessage) {
+    FreeList(FindPlayerByHandle(server_players, handle));
+
     switch (role) {
         case NET_ROLE_SERVER:
             printf("Client (%d) is disconnecting! %s\n", handle, pMessage ? pMessage : "");
@@ -191,9 +233,9 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle) {
  * In the rare case that we can't allocate an ID (if you can find 2147483647 players LMAO), this function will return null.
  */
 static inline struct PlayersLinkedList *AddPlayer(const ConnectionHandle handle, int id) {
-    if (server_players && IDExistsInList(server_players, id)) {
+    if (server_players && FindPlayerByID(server_players, id)) {
         id = 0;
-        while (IDExistsInList(server_players, id) && id < INT_MAX) {
+        while (FindPlayerByID(server_players, id) && id < INT_MAX) {
             id++;
         }
 
@@ -302,5 +344,6 @@ void NETHandleConnectionFailure(const char * const pReason) {
 }
 
 void NETCleanup() {
-    FreePlayersLinkedList(server_players);
+    FreeLists(server_players);
+    server_players = NULL;
 }
