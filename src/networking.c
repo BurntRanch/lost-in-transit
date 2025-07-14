@@ -133,19 +133,14 @@ static inline void FreeLists(struct PlayersLinkedList * list) {
         return;
     }
 
-    if (list->next == list->prev && list->prev == NULL) {
-        /* Free this single element and return. */
-        free(list);
-        return;
-    }
-
     while (list->prev != NULL) {
         list = list->prev;
     }
 
     while (list != NULL) {
-        list = list->next;
-        free(list->prev);
+        struct PlayersLinkedList *next = list->next;
+        free(list);
+        list = next;
     }
 }
 

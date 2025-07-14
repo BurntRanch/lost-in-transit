@@ -169,6 +169,8 @@ bool SRIsHostingServer(void) {
 }
 
 void SRStopServer(void) {
+    NETCleanup();
+
     for (const HSteamNetConnection &conn : server_clients) {
         SteamNetworkingSockets()->CloseConnection(conn, 0, "Server shutting down", true);
         server_clients.erase(server_clients.begin());

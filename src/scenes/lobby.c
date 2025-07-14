@@ -233,15 +233,16 @@ bool LobbyInit(SDL_Renderer *pRenderer) {
     ip = NULL;
 
     status_label.text = malloc(256);
+    status_label.text[0] = 'a';
+    status_label.text[1] = '\0';
 
     /* The initial text depends on what we're doing. */
     if (lobby_is_hosting) {
-        if (!(ip = SRStartServer(DEFAULT_PORT)) || !SRConnectToServerIPv4(LOCALHOST, DEFAULT_PORT)) {
-            return false;
+        if ((ip = SRStartServer(DEFAULT_PORT)) && SRConnectToServerIPv4(LOCALHOST, DEFAULT_PORT)) {
+            strcpy(status_label.text, "IP: ");
+            strncat(status_label.text, ip, 128);
         }
 
-        strcpy(status_label.text, "IP: ");
-        strncat(status_label.text, ip, 128);
         if (!UpdateText(&status_label)) {
             return false;
         }
@@ -281,7 +282,7 @@ bool LobbyRender(void) {
     if (!SRIsConnectedToServer() && lobby_is_hosting) {
         SRStopServer();
 
-        memcpy(status_label.text, "Failed to connect to local host!", 33);
+        strcpy(status_label.text, "Failed to host! (Is there another instance running?)");
         if (!UpdateText(&status_label)) {
             return false;
         }
@@ -326,7 +327,7 @@ bool LobbyRender(void) {
         return false;
     }
 
-    if (lobby_is_hosting) {
+    if (lobby_is_hosting && SRIsHostingServer()) {
         if (copy_button_apply_effect) {
             if (!SDL_SetTextureColorMod(*copy_element.texture, 20, 235, 20)) {
                 fprintf(stderr, "Failed to set texture color modulation! (SDL Error: %s)\n", SDL_GetError());
