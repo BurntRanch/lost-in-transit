@@ -4,6 +4,7 @@
 #include "engine.h"
 #include "label.h"
 #include "scenes.h"
+#include "scenes/lobby.h"
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_pixels.h>
@@ -34,11 +35,13 @@ static inline void BackButtonPressed() {
 }
 
 static inline void HostButtonPressed() {
-    LEScheduleLoadScene(SCENE_HOST);
+    lobby_is_hosting = true;
+    LEScheduleLoadScene(SCENE_LOBBY);
 }
 
 static inline void ConnectButtonPressed() {
-    LEScheduleLoadScene(SCENE_CONNECT);
+    lobby_is_hosting = false;
+    LEScheduleLoadScene(SCENE_LOBBY);
 }
 
 bool PlayInit(SDL_Renderer *pRenderer) {

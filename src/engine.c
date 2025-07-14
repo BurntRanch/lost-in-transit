@@ -6,9 +6,8 @@
 
 #include "scenes/main_menu.h"
 #include "scenes/options.h"
-#include "scenes/host.h"
+#include "scenes/lobby.h"
 #include "scenes/play.h"
-#include "scenes/connect.h"
 
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
@@ -142,13 +141,8 @@ bool LELoadScene(const Uint8 scene) {
             return false;
         }
         break;
-    case SCENE_HOST:
-        if (!HostInit(renderer)) {
-            return false;
-        }
-        break;
-    case SCENE_CONNECT:
-        if (!ConnectInit(renderer)) {
+    case SCENE_LOBBY:
+        if (!LobbyInit(renderer)) {
             return false;
         }
         break;
@@ -177,11 +171,8 @@ void LECleanupScene(void) {
     case SCENE_PLAY:
         PlayCleanup();
         break;
-    case SCENE_HOST:
-        HostCleanup();
-        break;
-    case SCENE_CONNECT:
-        ConnectCleanup();
+    case SCENE_LOBBY:
+        LobbyCleanup();
         break;
     default:
         ;
@@ -240,13 +231,8 @@ bool LEStepRender(void) {
             return false;
         }
         break;
-    case SCENE_HOST:
-        if (!HostRender()) {
-            return false;
-        }
-        break;
-    case SCENE_CONNECT:
-        if (!ConnectRender()) {
+    case SCENE_LOBBY:
+        if (!LobbyRender()) {
             return false;
         }
         break;

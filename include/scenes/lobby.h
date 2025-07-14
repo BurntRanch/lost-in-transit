@@ -1,19 +1,21 @@
-#ifndef CONNECT_H
-#define CONNECT_H
+#ifndef HOST_H
+#define HOST_H
 
 #include <SDL3/SDL_render.h>
+
+extern bool lobby_is_hosting;
 
 /* Initialize elements such as text, etc.
  * Returns true on success.
  */
-bool ConnectInit(SDL_Renderer *pRenderer);
+bool LobbyInit(SDL_Renderer *pRenderer);
 
-/* Render the connect menu.
+/* Render the lobby.
  * Returns true if all went well.
  */
-bool ConnectRender(void);
+bool LobbyRender(void);
 
 /* Clean everything up. */
-void ConnectCleanup(void);
+void LobbyCleanup(void);
 
 #endif
