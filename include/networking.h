@@ -22,6 +22,11 @@ enum PacketType {
     PACKET_TYPE_DISCONNECT,
 };
 
+struct Player {
+    ConnectionHandle handle;
+    int id;
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,11 +36,14 @@ extern "C" {
  * disconnect callbacks may receive a string containing a "reason" behind the disconnect. May be NULL (indicating a normal/requested disconnect).
  *
  * the handle may also be 0, if it's set to 0 that means that the failure (never a natural disconnect) happened before a connection could be established.
+ *
+ * While disconnect/connect callbacks only concern the caller and the other side, Join callbacks may concern another player in the session.
+ * On the other hand, Leave callbacks **only** concern other players in the session. You'll receive a Disconnect callback if YOU are the one who left.
  */
 void NETSetServerDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char * const));
 void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char * const));
-void NETSetServerDataCallback(void (*pCallback)(const ConnectionHandle, const void * const, const size_t));
-void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const void * const, const size_t));
+void NETSetClientJoinCallback(void (*pCallback)(const ConnectionHandle, const struct Player * const));
+void NETSetClientLeaveCallback(void (*pCallback)(const ConnectionHandle, int));
 void NETSetServerConnectCallback(void (*pCallback)(const ConnectionHandle));
 void NETSetClientConnectCallback(void (*pCallback)(const ConnectionHandle));
 

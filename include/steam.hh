@@ -29,10 +29,14 @@ extern "C" {
     /* Disconnect a client from your beautiful server. */
     void SRDisconnectClient(const ConnectionHandle handle, const char *pReason);
 
+    bool SRIsHostingServer(void);
+
     void SRStopServer(void);
 
     bool SRConnectToServerIPv4(Uint32 ipv4, Uint16 port);
     bool SRConnectToServerIPv6(Uint8 *pIPv6, Uint16 port);
+
+    bool SRIsConnectedToServer(void);
 
     void SRDisconnectFromServer(void);
 

@@ -2,6 +2,7 @@
 #include "common.h"
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_stdinc.h>
 
 void InitButton(struct LE_Button * const pLEButton) {
     pLEButton->hovered = false;
@@ -24,10 +25,10 @@ bool ButtonStep(struct LE_Button * const pLEButton, const struct MouseInfo * con
                                     &pLEButton->hovered, &pLEButton->held, pLEButton->on_button_pressed))
             return false;
     
-    if (pLEButton->hovered && pLEButton->angle_perc <= BUTTON_ANGLE_PERCENTAGE_MAX) {
-        pLEButton->angle_perc += 3.125 * *pDelta;
-    } else if (!pLEButton->hovered && pLEButton->angle_perc >= BUTTON_ANGLE_PERCENTAGE_MIN) {
-        pLEButton->angle_perc -= 3.125 * *pDelta;
+    if (pLEButton->hovered) {
+        pLEButton->angle_perc = SDL_min(pLEButton->angle_perc + 3.125 * *pDelta, 1.0f);
+    } else if (!pLEButton->hovered) {
+        pLEButton->angle_perc = SDL_max(pLEButton->angle_perc - 3.125 * *pDelta, 0.0f);
     }
 
     pLEButton->angle = smoothstep(0.f, 1.f, pLEButton->angle_perc)*pLEButton->max_angle;

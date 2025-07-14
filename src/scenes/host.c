@@ -74,7 +74,7 @@ bool HostInit(SDL_Renderer *pRenderer) {
     copy_button.element = &copy_element;
 
     ip = NULL;
-    if (!(ip = SRStartServer(63288))) {
+    if (!(ip = SRStartServer(DEFAULT_PORT)) || !SRConnectToServerIPv4(LOCALHOST, DEFAULT_PORT)) {
         return false;
     }
 
@@ -98,14 +98,28 @@ bool HostInit(SDL_Renderer *pRenderer) {
 }
 
 bool HostRender(void) {
+    if (!SRIsConnectedToServer()) {
+        SRStopServer();
+
+        memcpy(ip_label.text, "Failed to connect to local host!", 33);
+        if (!UpdateText(&ip_label)) {
+            return false;
+        }
+
+        ip_dstrect.w = ip_label.surface->w;
+        ip_dstrect.h = ip_label.surface->h;
+    }
+
     back_element.dstrect.x = LEScreenWidth * 0.0125;
     back_element.dstrect.y = LEScreenHeight * 0.0125;
 
     ip_dstrect.x = LEScreenWidth * 0.0125;
     ip_dstrect.y = back_element.dstrect.h + back_element.dstrect.y;
     
-    copy_element.dstrect.x = ip_dstrect.w + ip_dstrect.x;
-    copy_element.dstrect.y = ip_dstrect.y;
+    if (SRIsHostingServer()) {
+        copy_element.dstrect.x = ip_dstrect.w + ip_dstrect.x;
+        copy_element.dstrect.y = ip_dstrect.y;
+    }
 
     struct MouseInfo mouse_info;
     mouse_info.state = SDL_GetMouseState(&mouse_info.x, &mouse_info.y);
@@ -113,16 +127,16 @@ bool HostRender(void) {
     if (!ButtonStep(&back_button, &mouse_info, &LEFrametime)) {
         return false;
     }
-
-    if (!ButtonStep(&copy_button, &mouse_info, &LEFrametime)) {
-        return false;
+    if (SRIsHostingServer()) {
+        if (!ButtonStep(&copy_button, &mouse_info, &LEFrametime)) {
+            return false;
+        }
     }
 
     if (!SDL_RenderTexture(renderer, ip_label.texture, NULL, &ip_dstrect)) {
         fprintf(stderr, "Failed to render IP text! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
-
     if (!SDL_RenderTextureRotated(renderer, *back_element.texture, NULL, &back_element.dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to render back button! (SDL Error: %s)\n", SDL_GetError());
         return false;
@@ -140,9 +154,11 @@ bool HostRender(void) {
         }
     }
 
-    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)copy_element.texture, NULL, &copy_element.dstrect, copy_button.angle, NULL, SDL_FLIP_NONE)) {
-        fprintf(stderr, "Failed to render copy button! (SDL Error: %s)\n", SDL_GetError());
-        return false;
+    if (SRIsHostingServer()) {
+        if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)copy_element.texture, NULL, &copy_element.dstrect, copy_button.angle, NULL, SDL_FLIP_NONE)) {
+            fprintf(stderr, "Failed to render copy button! (SDL Error: %s)\n", SDL_GetError());
+            return false;
+        }
     }
 
     return true;
@@ -156,5 +172,6 @@ void HostCleanup(void) {
     SDL_DestroyTexture(*back_element.texture);
     SDL_DestroyTexture(*copy_element.texture);
 
+    SRDisconnectFromServer();
     SRStopServer();
 }

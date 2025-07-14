@@ -83,6 +83,8 @@ static void Client_NetConnectionStatusChanged(SteamNetConnectionStatusChangedCal
             }
 
             SteamNetworkingSockets()->CloseConnection(pInfo->m_hConn, 0, NULL, false);
+
+            client_connection = k_HSteamNetConnection_Invalid;
             break;
         case k_ESteamNetworkingConnectionState_Connected:
             /* look mom! I got accepted! */
@@ -162,6 +164,10 @@ void SRDisconnectClient(const ConnectionHandle handle, const char * pReason) {
     SteamNetworkingSockets()->CloseConnection(handle, 0, pReason, true);
 }
 
+bool SRIsHostingServer(void) {
+    return server_listen_socket != k_HSteamListenSocket_Invalid;
+}
+
 void SRStopServer(void) {
     for (const HSteamNetConnection &conn : server_clients) {
         SteamNetworkingSockets()->CloseConnection(conn, 0, "Server shutting down", true);
@@ -205,6 +211,10 @@ bool SRConnectToServerIPv6(Uint8 *pIPv6, Uint16 port) {
     return ConnectToServer(&ipAddr);
 }
 
+bool SRIsConnectedToServer(void) {
+    return client_connection != k_HSteamNetConnection_Invalid;
+}
+
 void SRDisconnectFromServer(void) {
     if (client_connection != k_HSteamNetConnection_Invalid) {
         SteamNetworkingSockets()->CloseConnection(client_connection, 0, "Client Disconnect", true);
@@ -246,19 +256,16 @@ bool SRPollConnections(void) {
     }
 
     if (client_connection != k_HSteamNetConnection_Invalid) {
-        SteamNetworkingMessage_t *messages = nullptr;
-        int msgCount = SteamNetworkingSockets()->ReceiveMessagesOnConnection(client_connection, &messages, 5);
+        SteamNetworkingMessage_t *message = nullptr;
+        int msgCount = SteamNetworkingSockets()->ReceiveMessagesOnConnection(client_connection, &message, 1);
 
         if (msgCount < -1) {
             fprintf(stderr, "Failed to receive messages from client connection!\n");
             return false;
         }
 
-        for (int i = 0; i < msgCount; i++) {
-            SteamNetworkingMessage_t *message = &messages[i];
-
+        if (message && msgCount == 1) {
             NETHandleData(NET_ROLE_CLIENT, message->GetConnection(), message->GetData(), message->GetSize());
-
             message->Release();
         }
     }

@@ -26,11 +26,6 @@ struct DisconnectPacket {
     int id;
 };
 
-struct Player {
-    ConnectionHandle handle;
-    int id;
-};
-
 struct PlayersLinkedList {
     /* Next element. NULL if this is the last element. */
     struct PlayersLinkedList *next;
@@ -47,6 +42,8 @@ static void (*server_connect_callback)(const ConnectionHandle) = NULL;
 
 static void (*client_disconnect_callback)(const ConnectionHandle, const char * const) = NULL;
 static void (*client_data_callback)(const ConnectionHandle, const void * const, const size_t) = NULL;
+static void (*client_join_callback)(const ConnectionHandle, const struct Player * const) = NULL;
+static void (*client_leave_callback)(const ConnectionHandle, int) = NULL;
 static void (*client_connect_callback)(const ConnectionHandle) = NULL;
 
 /* who are we to the server? */
@@ -168,6 +165,12 @@ void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, co
 void NETSetClientConnectCallback(void (*pCallback)(const ConnectionHandle)) {
     client_connect_callback = pCallback;
 }
+void NETSetClientJoinCallback(void (*pCallback)(const ConnectionHandle, const struct Player * const)) {
+    client_join_callback = pCallback;
+}
+void NETSetClientLeaveCallback(void (*pCallback)(const ConnectionHandle, int)) {
+    client_leave_callback = pCallback;
+}
 void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t)) {
     client_data_callback = pCallback;
 }
@@ -175,12 +178,18 @@ void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const vo
 void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const pMessage) {
     struct PlayersLinkedList *player_list = FindPlayerByHandle(server_players, handle);
 
-    /* Make sure we don't leave behind a dangling pointer */
-    if (server_players == player_list && player_list) {
-        server_players = player_list->next;
-    }
+    if (player_list) {
+        struct DisconnectPacket packet = { PACKET_TYPE_DISCONNECT, player_list->this.id };
 
-    FreeList(player_list);
+        SRSendMessageToClients(&packet, sizeof(packet));
+        
+        /* Make sure we don't leave behind a dangling pointer */
+        if (server_players == player_list) {
+            server_players = player_list->next;
+        }
+
+        FreeList(player_list);
+    }
 
     switch (role) {
         case NET_ROLE_SERVER:
@@ -264,7 +273,29 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
         return;
     }
 
+    struct PlayersLinkedList *last_list = server_players;
+    while (last_list->next) {
+        last_list = last_list->next;
+    }
+
     struct HelloPacket packet = { PACKET_TYPE_HELLO, hello_packet->server_handle, player_list->this.id };
+    /* send the player hello packets for every existing player so they catch up */
+    while (last_list) {
+        packet.server_handle = last_list->this.handle;
+        packet.id = last_list->this.id;
+
+        /* we want to send this one to **everybody** */
+        if (last_list == player_list) {
+            break;
+        }
+
+        if (!SRSendToConnection(handle, &packet, sizeof(packet))) {
+            return;
+        }
+
+        last_list = last_list->prev;
+    }
+
     if (!SRSendMessageToClients(&packet, sizeof(packet))) {
         return; /* how */
     }
@@ -280,6 +311,18 @@ static inline void Client_HandleHelloPacket(const ConnectionHandle handle, const
         printf("Server signed us in with ID %d!\n", hello_packet->id);
     } else {
         printf("Server signed someone else in with ID %d.\n", hello_packet->id);
+    }
+
+    if (client_join_callback) {
+        const struct Player player = { hello_packet->server_handle, hello_packet->id };
+
+        client_join_callback(handle, &player);
+    }
+}
+
+static inline void Client_HandleDisconnectPacket(const ConnectionHandle handle, const struct DisconnectPacket * const disconnect_packet) {
+    if (client_leave_callback) {
+        client_leave_callback(handle, disconnect_packet->id);
     }
 }
 
@@ -309,6 +352,17 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
                     break;
             }
 
+            break;
+        case PACKET_TYPE_DISCONNECT:
+            if (size < sizeof(struct DisconnectPacket)) {
+                fprintf(stderr, "Received malformed packet! (size < sizeof(struct DisconnectPacket))\n");
+                return;
+            }
+
+            const struct DisconnectPacket * const disconnect_packet = data;
+
+            /* this only comes from the server so we assume NET_ROLE_CLIENT */
+            Client_HandleDisconnectPacket(handle, disconnect_packet);
             break;
         default:
             fprintf(stderr, "Received malformed packet! (invalid type)\n");
