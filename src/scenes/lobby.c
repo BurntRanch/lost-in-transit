@@ -203,8 +203,6 @@ bool LobbyInit(SDL_Renderer *pRenderer) {
         return false;
     }
     box_element.texture = &box_texture;
-    box_element.dstrect.w = (*box_element.texture)->w * 2;
-    box_element.dstrect.h = (*box_element.texture)->h;
 
     if (!(back_texture = IMG_LoadTexture(renderer, "images/back.png"))) {
         fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
@@ -233,8 +231,7 @@ bool LobbyInit(SDL_Renderer *pRenderer) {
     ip = NULL;
 
     status_label.text = malloc(256);
-    status_label.text[0] = 'a';
-    status_label.text[1] = '\0';
+    strcpy(status_label.text, "Failed to connect!");
 
     /* The initial text depends on what we're doing. */
     if (lobby_is_hosting) {
@@ -253,11 +250,10 @@ bool LobbyInit(SDL_Renderer *pRenderer) {
         copy_element.dstrect.h = status_dstrect.h;
         copy_element.dstrect.w = copy_element.dstrect.h; /* Aspect ratio is always 1:1 (128x128) for the image, So we just set the width to the height of the text */
     } else {
-        if (!SRConnectToServerIPv4(LOCALHOST, DEFAULT_PORT)) {
-            return false;
+        if (SRConnectToServerIPv4(LOCALHOST, DEFAULT_PORT)) {
+            strcpy(status_label.text, "Connecting..");
         }
 
-        strcpy(status_label.text, "Connecting..");
         if (!UpdateText(&status_label)) {
             return false;
         }
@@ -291,14 +287,16 @@ bool LobbyRender(void) {
         status_dstrect.h = status_label.surface->h;
     }
 
-    box_element.dstrect.x = LEScreenWidth * 0.5 - box_element.dstrect.w * 0.5;
-    box_element.dstrect.y = LEScreenHeight * 0.5 - box_element.dstrect.h * 0.5;
-
     back_element.dstrect.x = LEScreenWidth * 0.0125;
     back_element.dstrect.y = LEScreenHeight * 0.0125;
 
     status_dstrect.x = LEScreenWidth * 0.0125;
     status_dstrect.y = back_element.dstrect.h + back_element.dstrect.y;
+
+    box_element.dstrect.w = SDL_min((*box_element.texture)->w * 2, LEScreenWidth - 10); /* Leave 10px (5px each side) of space as a minimum */
+    box_element.dstrect.h = SDL_min((*box_element.texture)->h, LEScreenHeight - (status_dstrect.y + status_dstrect.h));
+    box_element.dstrect.x = LEScreenWidth * 0.5 - box_element.dstrect.w * 0.5;
+    box_element.dstrect.y = SDL_max(LEScreenHeight * 0.5 - box_element.dstrect.h * 0.5, status_dstrect.y + status_dstrect.h);
     
     if (lobby_is_hosting) {
         copy_element.dstrect.x = status_dstrect.w + status_dstrect.x;
