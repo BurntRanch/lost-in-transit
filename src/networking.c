@@ -1,11 +1,17 @@
 #include "networking.h"
 #include "steam.hh"
 
+#include <SDL3/SDL_log.h>
 #include <SDL3/SDL_stdinc.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+/* The ID that an administrator will have. Administrators can kick players and start games.
+ * Clients will automatically request this ID, but because the ID system is server-authoritative, only the first client to ever connect will get this ID.
+ */
+#define ADMIN_ID    4500
 
 /* Sent by a client, echo'd out by the server. */
 struct HelloPacket {
@@ -19,11 +25,24 @@ struct HelloPacket {
     int id;
 };
 
-/* Sent by a server. */
+/* Sent by the server. */
 struct DisconnectPacket {
     enum PacketType type;
 
     int id;
+};
+
+/* Sent by the client, and the server will only actually take action if the client is an administrator. */
+struct RequestStartPacket {
+    enum PacketType type;
+};
+
+/* Sent by the server. */
+struct TransitionPacket {
+    enum PacketType type;
+
+    /* Which part of the game loop should the players go to? */
+    enum TransDestination dest;
 };
 
 struct PlayersLinkedList {
@@ -48,6 +67,8 @@ static void (*client_connect_callback)(const ConnectionHandle) = NULL;
 
 /* who are we to the server? */
 static struct Player client_self;
+/* Our connection to the server. */
+static ConnectionHandle client_connection;
 
 static struct PlayersLinkedList *server_players = NULL;
 
@@ -171,23 +192,23 @@ void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const vo
 }
 
 void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char * const pMessage) {
-    struct PlayersLinkedList *player_list = FindPlayerByHandle(server_players, handle);
-
-    if (player_list) {
-        struct DisconnectPacket packet = { PACKET_TYPE_DISCONNECT, player_list->this.id };
-
-        SRSendMessageToClients(&packet, sizeof(packet));
-        
-        /* Make sure we don't leave behind a dangling pointer */
-        if (server_players == player_list) {
-            server_players = player_list->next;
-        }
-
-        FreeList(player_list);
-    }
-
     switch (role) {
         case NET_ROLE_SERVER:
+            struct PlayersLinkedList *player_list = FindPlayerByHandle(server_players, handle);
+
+            if (player_list) {
+                struct DisconnectPacket packet = { PACKET_TYPE_DISCONNECT, player_list->this.id };
+
+                SRSendMessageToClients(&packet, sizeof(packet));
+                
+                /* Make sure we don't leave behind a dangling pointer */
+                if (server_players == player_list) {
+                    server_players = player_list->next;
+                }
+
+                FreeList(player_list);
+            }
+
             printf("Client (%d) is disconnecting! %s\n", handle, pMessage ? pMessage : "");
             
             if (server_disconnect_callback) {
@@ -217,6 +238,7 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle) {
             printf("Connected to server (%d)!\n", handle);
 
             client_self.handle = 0;
+            client_connection = handle;
 
             /* watch how the server overrides our constant 4500 ID. */
             struct HelloPacket packet = { PACKET_TYPE_HELLO, handle, 4500 };
@@ -323,14 +345,14 @@ static inline void Client_HandleDisconnectPacket(const ConnectionHandle handle, 
 
 static void HandlePacket(const enum Role role, const ConnectionHandle handle, const void * const data, const size_t size) {
     if (size < sizeof(enum PacketType)) {
-        fprintf(stderr, "Received malformed packet! (size < uint32)\n");
+        SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "[ROLE %d]: Received malformed packet! (size < uint32)\n", role);
         return; /* why */
     }
 
     switch (*(enum PacketType *)data) {
         case PACKET_TYPE_HELLO:
             if (size < sizeof(struct HelloPacket)) {
-                fprintf(stderr, "Received malformed packet! (size < sizeof(struct HelloPacket))\n");
+                SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "[ROLE %d]: Received malformed packet! (size < sizeof(struct HelloPacket))\n", role);
                 return;
             }
 
@@ -359,8 +381,28 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
             /* this only comes from the server so we assume NET_ROLE_CLIENT */
             Client_HandleDisconnectPacket(handle, disconnect_packet);
             break;
+        case PACKET_TYPE_REQUEST_START:
+            /* There's no data, all we need to know is that this client requested to start the match. */
+            struct PlayersLinkedList *player = FindPlayerByHandle(server_players, handle);
+            if (!player) {
+                fprintf(stderr, "Unknown player tried starting the game!\n");
+                return;
+            }
+            if (player->this.id != ADMIN_ID) {
+                fprintf(stderr, "Non-admin (%d) tried starting the game!\n", player->this.id);
+                return;
+            }
+
+            /* The administrator has requested to start the game. */
+            struct TransitionPacket packet = { PACKET_TYPE_TRANSITION, TRANS_DEST_GAME };
+            if (!SRSendMessageToClients(&packet, sizeof(packet))) {
+                fprintf(stderr, "Failed to send TransitionPacket to clients!\n");
+                return;
+            }
+
+            break;
         default:
-            fprintf(stderr, "Received malformed packet! (invalid type)\n");
+            SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "[ROLE %d]: Received malformed packet! (invalid type)\n", role);
             ;
     }
 }
@@ -392,6 +434,16 @@ void NETHandleConnectionFailure(const char * const pReason) {
     if (client_disconnect_callback) {
         client_disconnect_callback(0, pReason);
     }
+}
+
+bool NETIsAdministrator() {
+    return client_self.id == ADMIN_ID;
+}
+
+void NETRequestStart() {
+    struct RequestStartPacket packet = {PACKET_TYPE_REQUEST_START};
+
+    SRSendToConnection(client_connection, &packet, sizeof(packet));
 }
 
 void NETCleanup() {

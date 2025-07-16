@@ -9,6 +9,7 @@
 
 #include <SDL3/SDL_clipboard.h>
 #include <SDL3/SDL_error.h>
+#include <SDL3/SDL_log.h>
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
@@ -48,6 +49,10 @@ static struct PlayerLabelsList *players_list;
 static struct SDL_Texture *back_texture;
 static struct LE_RenderElement back_element;
 static struct LE_Button back_button;
+
+static struct SDL_Texture *start_texture;
+static struct LE_RenderElement start_element;
+static struct LE_Button start_button;
 
 static struct LE_Label status_label;
 static struct SDL_FRect status_dstrect;
@@ -195,30 +200,46 @@ static inline void BackButtonPressed() {
     LEScheduleLoadScene(SCENE_PLAY);
 }
 
+static inline void StartButtonPressed() {
+    NETRequestStart();
+}
+
 bool LobbyInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
 
     if (!(box_texture = IMG_LoadTexture(renderer, "images/box.png"))) {
-        fprintf(stderr, "Failed to load 'images/box.png'! (SDL Error: %s)\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s\n", SDL_GetError());
         return false;
     }
     box_element.texture = &box_texture;
 
     if (!(back_texture = IMG_LoadTexture(renderer, "images/back.png"))) {
-        fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s\n", SDL_GetError());
         return false;
     }
     back_element.texture = &back_texture;
-    back_element.dstrect.w = (*back_element.texture)->w;
-    back_element.dstrect.h = (*back_element.texture)->h;
+    back_element.dstrect.w = back_texture->w;
+    back_element.dstrect.h = back_texture->h;
 
     InitButton(&back_button);
     back_button.max_angle = -10.0f;
     back_button.on_button_pressed = BackButtonPressed;
     back_button.element = &back_element;
 
+    if (!(start_texture = IMG_LoadTexture(renderer, "images/start.png"))) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s\n", SDL_GetError());
+        return false;
+    }
+    start_element.texture = &start_texture;
+    start_element.dstrect.w = start_texture->w;
+    start_element.dstrect.h = start_texture->h;
+
+    InitButton(&start_button);
+    start_button.element = &start_element;
+    start_button.on_button_pressed = StartButtonPressed;
+
     if (!(copy_texture = IMG_LoadTexture(renderer, "images/copy.png"))) {
-        fprintf(stderr, "Failed to load 'images/copy.png'! (SDL Error Code: %s)\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s\n", SDL_GetError());
         return false;
     }
     copy_element.texture = &copy_texture;
@@ -290,11 +311,14 @@ bool LobbyRender(void) {
     back_element.dstrect.x = LEScreenWidth * 0.0125;
     back_element.dstrect.y = LEScreenHeight * 0.0125;
 
+    start_element.dstrect.x = LEScreenWidth - start_element.dstrect.w - (LEScreenWidth * 0.0125);
+    start_element.dstrect.y = LEScreenHeight * 0.0125;
+
     status_dstrect.x = LEScreenWidth * 0.0125;
     status_dstrect.y = back_element.dstrect.h + back_element.dstrect.y;
 
     box_element.dstrect.w = SDL_min((*box_element.texture)->w * 2, LEScreenWidth - 10); /* Leave 10px (5px each side) of space as a minimum */
-    box_element.dstrect.h = SDL_min((*box_element.texture)->h, LEScreenHeight - (status_dstrect.y + status_dstrect.h));
+    box_element.dstrect.h = SDL_min((*box_element.texture)->h + (LEScreenHeight * 0.35), LEScreenHeight - (status_dstrect.y + status_dstrect.h) - 5);
     box_element.dstrect.x = LEScreenWidth * 0.5 - box_element.dstrect.w * 0.5;
     box_element.dstrect.y = SDL_max(LEScreenHeight * 0.5 - box_element.dstrect.h * 0.5, status_dstrect.y + status_dstrect.h);
     
@@ -313,6 +337,10 @@ bool LobbyRender(void) {
         if (!ButtonStep(&copy_button, &mouse_info, &LEFrametime)) {
             return false;
         }
+
+        if (!ButtonStep(&start_button, &mouse_info, &LEFrametime)) {
+            return false;
+        }
     }
 
     if (!SDL_RenderTextureRotated(renderer, *back_element.texture, NULL, &back_element.dstrect, back_button.angle, NULL, SDL_FLIP_NONE)) {
@@ -327,19 +355,24 @@ bool LobbyRender(void) {
 
     if (lobby_is_hosting && SRIsHostingServer()) {
         if (copy_button_apply_effect) {
-            if (!SDL_SetTextureColorMod(*copy_element.texture, 20, 235, 20)) {
+            if (!SDL_SetTextureColorMod(copy_texture, 20, 235, 20)) {
                 fprintf(stderr, "Failed to set texture color modulation! (SDL Error: %s)\n", SDL_GetError());
                 return false;
             }
         } else {
-            if (!SDL_SetTextureColorMod(*copy_element.texture, 255, 255, 255)) {
+            if (!SDL_SetTextureColorMod(copy_texture, 255, 255, 255)) {
                 fprintf(stderr, "Failed to set texture color modulation! (SDL Error: %s)\n", SDL_GetError());
                 return false;
             }
         }
 
-        if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)copy_element.texture, NULL, &copy_element.dstrect, copy_button.angle, NULL, SDL_FLIP_NONE)) {
+        if (!SDL_RenderTextureRotated(renderer, copy_texture, NULL, &copy_element.dstrect, copy_button.angle, NULL, SDL_FLIP_NONE)) {
             fprintf(stderr, "Failed to render copy button! (SDL Error: %s)\n", SDL_GetError());
+            return false;
+        }
+
+        if (!SDL_RenderTextureRotated(renderer, start_texture, NULL, &start_element.dstrect, start_button.angle, NULL, SDL_FLIP_NONE)) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to render start button! (SDL Error: %s)\n", SDL_GetError());
             return false;
         }
     }
@@ -372,6 +405,9 @@ void LobbyCleanup(void) {
     while (players_list) {
         struct PlayerLabelsList *list = players_list;
         players_list = players_list->next;
+
+        DestroyText(&list->label);
+
         SDL_free(list);
     }
 
@@ -379,10 +415,8 @@ void LobbyCleanup(void) {
     free(status_label.text);
     free(ip);
 
-    SDL_DestroyTexture(*box_element.texture);
-    SDL_DestroyTexture(*back_element.texture);
-    SDL_DestroyTexture(*copy_element.texture);
-
-    SRDisconnectFromServer();
-    SRStopServer();
+    SDL_DestroyTexture(start_texture);
+    SDL_DestroyTexture(box_texture);
+    SDL_DestroyTexture(back_texture);
+    SDL_DestroyTexture(copy_texture);
 }

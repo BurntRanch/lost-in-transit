@@ -20,6 +20,12 @@ enum Role {
 enum PacketType {
     PACKET_TYPE_HELLO,
     PACKET_TYPE_DISCONNECT,
+    PACKET_TYPE_REQUEST_START,
+    PACKET_TYPE_TRANSITION,
+};
+
+enum TransDestination {
+    TRANS_DEST_GAME,
 };
 
 struct Player {
@@ -65,6 +71,12 @@ void NETHandleData(const enum Role role, const ConnectionHandle handle, const vo
  * Speaking of showing errors, it will show the reason to the user. If the reason is null it's an "unexpected" error.
  */
 void NETHandleConnectionFailure(const char * const pReason);
+
+/* Check if we're an administrator. Shouldn't be called unless you're a client. */
+bool NETIsAdministrator();
+
+/* Ask the server to start the game. Only works if you're the administrator (Check with NETIsAdministrator). No guarantee of success. */
+void NETRequestStart();
 
 /* Clean up anything allocated in the heap. */
 void NETCleanup();

@@ -190,7 +190,7 @@ bool LEStepRender(void) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         /* If escape is held down OR a window close is requested, return false. */
-        if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+        if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) || event.type == SDL_EVENT_QUIT) {
             return false;
         }
         if (event.type == SDL_EVENT_WINDOW_RESIZED) {

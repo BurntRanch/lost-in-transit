@@ -5,6 +5,7 @@
 #include "label.h"
 #include "scenes.h"
 #include "scenes/lobby.h"
+#include "steam.hh"
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_pixels.h>
@@ -46,6 +47,10 @@ static inline void ConnectButtonPressed() {
 
 bool PlayInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
+
+    /* If we press back from the lobby menu, we want to stop the server and disconnect. */
+    SRDisconnectFromServer();
+    SRStopServer();
 
     if (!(back_texture = IMG_LoadTexture(renderer, "images/back.png"))) {
         fprintf(stderr, "Failed to load 'images/back.png'! (SDL Error Code: %s)\n", SDL_GetError());
