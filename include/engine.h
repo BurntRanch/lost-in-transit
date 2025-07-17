@@ -1,6 +1,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
+#include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -11,6 +12,11 @@ extern TTF_Font *pLEGameFont;
 extern int LEScreenWidth, LEScreenHeight;
 
 extern double LEFrametime;
+
+/* Only used in 3D accelerated scenes. */
+extern SDL_GPUCommandBuffer *LECommandBuffer;
+extern SDL_GPUTexture *LESwapchainTexture;
+extern Uint32 LESwapchainWidth, LESwapchainHeight;
 
 /* Returns true on success. */
 bool LEInitWindow(void);

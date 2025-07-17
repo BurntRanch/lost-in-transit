@@ -1,4 +1,6 @@
 #include "networking.h"
+#include "engine.h"
+#include "scenes.h"
 #include "steam.hh"
 
 #include <SDL3/SDL_log.h>
@@ -345,14 +347,14 @@ static inline void Client_HandleDisconnectPacket(const ConnectionHandle handle, 
 
 static void HandlePacket(const enum Role role, const ConnectionHandle handle, const void * const data, const size_t size) {
     if (size < sizeof(enum PacketType)) {
-        SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "[ROLE %d]: Received malformed packet! (size < uint32)\n", role);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[ROLE %d]: Received malformed packet! (size < uint32)\n", role);
         return; /* why */
     }
 
     switch (*(enum PacketType *)data) {
         case PACKET_TYPE_HELLO:
             if (size < sizeof(struct HelloPacket)) {
-                SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "[ROLE %d]: Received malformed packet! (size < sizeof(struct HelloPacket))\n", role);
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[ROLE %d]: Received malformed packet! (size < sizeof(struct HelloPacket))\n", role);
                 return;
             }
 
@@ -372,7 +374,7 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
             break;
         case PACKET_TYPE_DISCONNECT:
             if (size < sizeof(struct DisconnectPacket)) {
-                fprintf(stderr, "Received malformed packet! (size < sizeof(struct DisconnectPacket))\n");
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Received malformed packet! (size < sizeof(struct DisconnectPacket))\n");
                 return;
             }
 
@@ -394,15 +396,32 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
             }
 
             /* The administrator has requested to start the game. */
-            struct TransitionPacket packet = { PACKET_TYPE_TRANSITION, TRANS_DEST_GAME };
+            struct TransitionPacket packet = { PACKET_TYPE_TRANSITION, TRANS_DEST_INTRO };
             if (!SRSendMessageToClients(&packet, sizeof(packet))) {
                 fprintf(stderr, "Failed to send TransitionPacket to clients!\n");
                 return;
             }
 
             break;
+        case PACKET_TYPE_TRANSITION:
+            if (size < sizeof(struct TransitionPacket)) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Received malformed packet! (size < sizeof(struct TransitionPacket))");
+                return;
+            }
+
+            const struct TransitionPacket * transition_packet = data;
+
+            switch (transition_packet->dest) {
+            case TRANS_DEST_INTRO:
+                LEScheduleLoadScene(SCENE3D_INTRO);
+                break;
+            default:
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Received malformed packet! (unknown destination)\n");
+            }
+
+            break;
         default:
-            SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "[ROLE %d]: Received malformed packet! (invalid type)\n", role);
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[ROLE %d]: Received malformed packet! (invalid type)\n", role);
             ;
     }
 }

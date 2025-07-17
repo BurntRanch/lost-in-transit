@@ -25,7 +25,7 @@ enum PacketType {
 };
 
 enum TransDestination {
-    TRANS_DEST_GAME,
+    TRANS_DEST_INTRO,
 };
 
 struct Player {

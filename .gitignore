@@ -1,5 +1,7 @@
 build*/
 
+cglm-0.9.6
+
 *.tar.*
 *.mo
 
