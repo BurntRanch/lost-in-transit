@@ -50,9 +50,7 @@ static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t 
     return true;
 }
 
-bool IntroInit(SDL_GPUDevice *pGPUDevice) {
-    gpu_device = pGPUDevice;
-
+static inline bool InitTestPipeline() {
     SDL_GPUShaderCreateInfo vertex_shader_create_info, fragment_shader_create_info;
     vertex_shader_create_info.code = NULL;
     vertex_shader_create_info.code_size = sizeof(NULL);
@@ -154,56 +152,70 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     return true;
 }
 
+static inline bool CopyTestVertices() {
+    SDL_GPUCopyPass *copy_pass;
+
+    if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin GPU copy pass! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUBufferCreateInfo vertex_buffer_create_info;
+    vertex_buffer_create_info.props = 0;
+    vertex_buffer_create_info.size = sizeof(vertices);
+    vertex_buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+
+    if (!(test_vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create GPU buffer! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    static SDL_GPUTransferBuffer *transfer_buffer = NULL;
+
+    SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
+    transfer_buffer_create_info.props = 0;
+    transfer_buffer_create_info.size = vertex_buffer_create_info.size;
+    transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+
+    if (!(transfer_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create transfer buffer! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    void *data = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, false);
+
+    SDL_memcpy(data, &vertices, sizeof(vertices));
+
+    SDL_GPUTransferBufferLocation src;
+    src.offset = 0;
+    src.transfer_buffer = transfer_buffer;
+
+    SDL_GPUBufferRegion dst;
+    dst.offset = 0;
+    dst.size = vertex_buffer_create_info.size;
+    dst.buffer = test_vertex_buffer;
+
+    SDL_UploadToGPUBuffer(copy_pass, &src, &dst, false);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    return true;
+}
+
+bool IntroInit(SDL_GPUDevice *pGPUDevice) {
+    gpu_device = pGPUDevice;
+
+    if (!InitTestPipeline()) {
+        return false;
+    }
+
+    return true;
+}
+
 bool IntroRender(void) {
-    /* initialize vertex buffer if not initialized */
-    if (!test_vertex_buffer) {
-        SDL_GPUCopyPass *copy_pass;
-
-        if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin GPU copy pass! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
-
-        SDL_GPUBufferCreateInfo vertex_buffer_create_info;
-        vertex_buffer_create_info.props = 0;
-        vertex_buffer_create_info.size = sizeof(vertices);
-        vertex_buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-
-        if (!(test_vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info))) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create GPU buffer! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
-
-        static SDL_GPUTransferBuffer *transfer_buffer = NULL;
-
-        SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
-        transfer_buffer_create_info.props = 0;
-        transfer_buffer_create_info.size = vertex_buffer_create_info.size;
-        transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-
-        if (!(transfer_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info))) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create transfer buffer! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
-
-        void *data = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, false);
-
-        SDL_memcpy(data, &vertices, sizeof(vertices));
-
-        SDL_GPUTransferBufferLocation src;
-        src.offset = 0;
-        src.transfer_buffer = transfer_buffer;
-
-        SDL_GPUBufferRegion dst;
-        dst.offset = 0;
-        dst.size = vertex_buffer_create_info.size;
-        dst.buffer = test_vertex_buffer;
-
-        SDL_UploadToGPUBuffer(copy_pass, &src, &dst, false);
-
-        SDL_EndGPUCopyPass(copy_pass);
-
-        return true;
+    /* initialize vertex buffer if not initialized, exit on failure */
+    if (!test_vertex_buffer && !CopyTestVertices()) {
+        return false;
     }
 
     static SDL_GPUColorTargetInfo color_target_info;

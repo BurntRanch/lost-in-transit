@@ -141,8 +141,32 @@ bool UpdateText(struct LE_Label * const pLEText) {
 /* What's the currently loaded scene? Refer to scenes.h for values */
 static Uint8 scene_loaded = SCENE_NONE;
 
+/* Initialize [LECommandBuffer] and [LESwapchain*] */
+static inline bool StartGPURendering() {
+    if (!(LECommandBuffer = SDL_AcquireGPUCommandBuffer(gpu_device))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to acquire command buffer for GPU device! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(LECommandBuffer, window, &LESwapchainTexture, &LESwapchainWidth, &LESwapchainHeight)) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to acquire swapchain texture from command buffer! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    return true;
+}
+
+static inline bool FinishGPURendering() {
+    if (!SDL_SubmitGPUCommandBuffer(LECommandBuffer)) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to submit command buffer to GPU device! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    return true;
+}
+
 /* Starts using the GPU Device. reinitializes the window. */
-static bool StartGPUDevice() {
+static inline bool StartGPUDevice() {
     if (is_using_gpu) {
         return true;
     }
@@ -151,11 +175,17 @@ static bool StartGPUDevice() {
 
     LEInitWindow();
 
+    /* We have to submit a command buffer (even if it's empty) to make the window visible. */
+    /* We do this so that the user doesn't get confused when the window just disappears and doesn't appear for a few seconds. */
+    if (!StartGPURendering() || !FinishGPURendering()) {
+        return false;
+    }
+
     return true;
 }
 
 /* Stops using the GPU Device. reinitializes the window. */
-static bool StopGPUDevice() {
+static inline bool StopGPUDevice() {
     if (!is_using_gpu) {
         return true;
     }
@@ -277,13 +307,7 @@ bool LEStepRender(void) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(renderer);
     } else {
-        if (!(LECommandBuffer = SDL_AcquireGPUCommandBuffer(gpu_device))) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to acquire command buffer for GPU device! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
-
-        if (!SDL_WaitAndAcquireGPUSwapchainTexture(LECommandBuffer, window, &LESwapchainTexture, &LESwapchainWidth, &LESwapchainHeight)) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to acquire swapchain texture from command buffer! (SDL Error: %s)\n", SDL_GetError());
+        if (!StartGPURendering()) {
             return false;
         }
     }
@@ -322,8 +346,7 @@ bool LEStepRender(void) {
     if (!is_using_gpu) {
         SDL_RenderPresent(renderer);
     } else {
-        if (!SDL_SubmitGPUCommandBuffer(LECommandBuffer)) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to submit command buffer to GPU device! (SDL Error: %s)\n", SDL_GetError());
+        if (!FinishGPURendering()) {
             return false;
         }
     }

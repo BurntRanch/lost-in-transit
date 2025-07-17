@@ -170,10 +170,9 @@ static void UpdateStatusConnected(const ConnectionHandle _) {
 }
 static void UpdateStatusDisconnected(const ConnectionHandle _, const char * const pReason) {
     if (pReason) {
-        strncpy(status_label.text, pReason, 255);
-        status_label.text[255] = '\0';
+        snprintf(status_label.text, 256, "%s", pReason);
     } else {
-        strcpy(status_label.text, "Disconnected");
+        sprintf(status_label.text, "Disconnected");
     }
 
     if (!UpdateText(&status_label)) {
@@ -252,13 +251,12 @@ bool LobbyInit(SDL_Renderer *pRenderer) {
     ip = NULL;
 
     status_label.text = malloc(256);
-    strcpy(status_label.text, "Failed to connect!");
+    sprintf(status_label.text, "Failed to connect!");
 
     /* The initial text depends on what we're doing. */
     if (lobby_is_hosting) {
         if ((ip = SRStartServer(DEFAULT_PORT)) && SRConnectToServerIPv4(LOCALHOST, DEFAULT_PORT)) {
-            strcpy(status_label.text, "IP: ");
-            strncat(status_label.text, ip, 128);
+            snprintf(status_label.text, 256, "IP: %s", ip);
         }
 
         if (!UpdateText(&status_label)) {
@@ -272,7 +270,7 @@ bool LobbyInit(SDL_Renderer *pRenderer) {
         copy_element.dstrect.w = copy_element.dstrect.h; /* Aspect ratio is always 1:1 (128x128) for the image, So we just set the width to the height of the text */
     } else {
         if (SRConnectToServerIPv4(LOCALHOST, DEFAULT_PORT)) {
-            strcpy(status_label.text, "Connecting..");
+            sprintf(status_label.text, "Connecting..");
         }
 
         if (!UpdateText(&status_label)) {
@@ -299,7 +297,7 @@ bool LobbyRender(void) {
     if (!SRIsConnectedToServer() && lobby_is_hosting) {
         SRStopServer();
 
-        strcpy(status_label.text, "Failed to host! (Is there another instance running?)");
+        sprintf(status_label.text, "Failed to host! (Is there another instance running?)");
         if (!UpdateText(&status_label)) {
             return false;
         }
