@@ -91,7 +91,7 @@ bool LEInitWindow(void) {
     }
 
     if (!SDL_GetWindowSize(window, &LEScreenWidth, &LEScreenHeight)) {
-        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting renderer output size! (SDL Error: %s)\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting window size! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
@@ -191,6 +191,9 @@ static inline bool StopGPUDevice() {
     }
 
     is_using_gpu = false;
+
+    SDL_ReleaseWindowFromGPUDevice(gpu_device, window);
+    SDL_DestroyGPUDevice(gpu_device);
 
     LEInitWindow();
 
@@ -293,9 +296,9 @@ bool LEStepRender(void) {
         /* If escape is held down OR a window close is requested, return false. */
         if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) || event.type == SDL_EVENT_QUIT) {
             return false;
-        }
-        if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-            SDL_GetWindowSize(window, &LEScreenWidth, &LEScreenHeight);
+        } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+            LEScreenWidth = event.window.data1;
+            LEScreenHeight = event.window.data2;
         }
     }
 

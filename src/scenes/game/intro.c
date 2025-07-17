@@ -1,13 +1,15 @@
 #include "scenes/game/intro.h"
 #include "cglm/types.h"
 #include "engine.h"
+#include "networking.h"
+#include "scenes.h"
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_gpu.h>
+#include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_stdinc.h>
 #include <cglm/cglm.h>
-#include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
 
@@ -32,20 +34,14 @@ static const struct Vertex vertices[3] = {  { { -1.0f, 0.0f } },
 
 /* Don't laugh */
 static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t *pSizeOut) {
-    FILE *file = fopen(fileName, "rb");
+    void *data = NULL;
 
-    if (!file) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open shader file %s! (errno: %d)\n", fileName, errno);
+    if (!(data = SDL_LoadFile(fileName, pSizeOut))) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open shader file %s! (SDL Error: %s)\n", fileName, SDL_GetError());
         return false;
     }
-    
-    fseek(file, 0, SEEK_END);
-    *pSizeOut = ftell(file);
-    *ppBufferOut = SDL_malloc(*pSizeOut);
 
-    rewind(file);
-
-    fread(*ppBufferOut, *pSizeOut, *pSizeOut, file);
+    *ppBufferOut = data;
 
     return true;
 }
@@ -63,7 +59,9 @@ static inline bool InitTestPipeline() {
     vertex_shader_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     vertex_shader_create_info.props = 0;
 
-    LoadShader("shaders/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size);
+    if (!LoadShader("shaders/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
+        return false;
+    }
 
     fragment_shader_create_info.code = NULL;
     fragment_shader_create_info.code_size = sizeof(NULL);
@@ -76,7 +74,9 @@ static inline bool InitTestPipeline() {
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
-    LoadShader("shaders/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size);
+    if (!LoadShader("shaders/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
+        return false;
+    }
 
     if (!(test_shader.vertex = SDL_CreateGPUShader(gpu_device, &vertex_shader_create_info))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test vertex GPU shader! (SDL Error: %s)\n", SDL_GetError());
@@ -86,6 +86,9 @@ static inline bool InitTestPipeline() {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test fragment GPU shader! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
+
+    SDL_free((void *)vertex_shader_create_info.code);
+    SDL_free((void *)fragment_shader_create_info.code);
 
     struct SDL_GPUColorTargetDescription color_target_description;
     color_target_description.blend_state.enable_color_write_mask = false;
@@ -202,12 +205,18 @@ static inline bool CopyTestVertices() {
     return true;
 }
 
+static void GoToMainMenu(const ConnectionHandle _, [[gnu::unused]] const char * const _pReason) {
+    LEScheduleLoadScene(SCENE_MAINMENU);
+}
+
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     gpu_device = pGPUDevice;
 
     if (!InitTestPipeline()) {
         return false;
     }
+
+    NETSetClientDisconnectCallback(GoToMainMenu);
 
     return true;
 }
@@ -227,7 +236,7 @@ bool IntroRender(void) {
 
     static SDL_GPURenderPass *render_pass;
 
-    static SDL_GPUViewport viewport = {0, 0, 800, 600, 0.0f, 1.0f};
+    SDL_GPUViewport viewport = {0, 0, LESwapchainWidth, LESwapchainHeight, 0.0f, 1.0f};
 
     if (!(render_pass = SDL_BeginGPURenderPass(LECommandBuffer, &color_target_info, 1, NULL))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin render pass! (SDL Error: %s)\n", SDL_GetError());
@@ -251,5 +260,11 @@ bool IntroRender(void) {
 }
 
 void IntroCleanup(void) {
-    
+    SDL_ReleaseGPUBuffer(gpu_device, test_vertex_buffer);
+    test_vertex_buffer = NULL;
+
+    SDL_ReleaseGPUGraphicsPipeline(gpu_device, test_pipeline);
+
+    SDL_ReleaseGPUShader(gpu_device, test_shader.vertex);
+    SDL_ReleaseGPUShader(gpu_device, test_shader.fragment);
 }
