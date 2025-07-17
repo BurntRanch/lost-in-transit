@@ -1,7 +1,9 @@
 #ifndef MAIN_MENU_H
 #define MAIN_MENU_H
 
+#include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_scancode.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
 /* Initialize elements such as text, etc.
@@ -13,6 +15,12 @@ bool MainMenuInit(SDL_Renderer *pRenderer);
  * Returns true if all went well.
  */
 bool MainMenuRender(void);
+
+/* Handle a key down event. */
+bool MainMenuKeyDown(SDL_Scancode scancode, SDL_Keymod keymods);
+
+/* Called when the mouse moves.. */
+void MainMenuMouseMoved();
 
 /* Clean everything up. */
 void MainMenuCleanup(void);

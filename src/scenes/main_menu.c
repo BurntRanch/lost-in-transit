@@ -7,10 +7,13 @@
 #include "scenes.h"
 
 #include <SDL3/SDL_error.h>
+#include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_log.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_surface.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -157,9 +160,31 @@ bool MainMenuRender(void) {
     return true;
 }
 
+bool MainMenuKeyDown(SDL_Scancode scancode, SDL_Keymod keymods) {
+    switch (scancode) {
+        case SDL_SCANCODE_TAB:
+            Navigate((struct LE_Button *[3]){ &play_button, &options_button, &exit_button }, 3, keymods & SDL_KMOD_SHIFT);
+            break;
+        case SDL_SCANCODE_SPACE:
+        case SDL_SCANCODE_RETURN:
+            PressActiveButton();
+            break;
+        default:
+            ;
+    }
+
+    return true;
+}
+
+void MainMenuMouseMoved() {
+    DisableNavigation();
+}
+
 void MainMenuCleanup(void) {
     DestroyText(&title_label);
     DestroyText(&play_label);
     DestroyText(&options_label);
     DestroyText(&exit_label);
+
+    DisableNavigation();
 }

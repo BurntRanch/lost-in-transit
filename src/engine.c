@@ -299,6 +299,25 @@ bool LEStepRender(void) {
         } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
             LEScreenWidth = event.window.data1;
             LEScreenHeight = event.window.data2;
+        } else if (event.type == SDL_EVENT_KEY_DOWN) {
+            /* Forward key event to scene */
+            switch (scene_loaded) {
+                case SCENE_MAINMENU:
+                    if (!MainMenuKeyDown(event.key.scancode, event.key.mod)) {
+                        return false;
+                    }
+                    break;
+                default:
+                    ;
+            } 
+        } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
+            switch (scene_loaded) {
+                case SCENE_MAINMENU:
+                    MainMenuMouseMoved();
+                    break;
+                default:
+                    ;
+            }
         }
     }
 

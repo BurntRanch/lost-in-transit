@@ -4,6 +4,7 @@
 #include "common.h"
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_stdinc.h>
 #include <stdbool.h>
 
 struct LE_Button {
@@ -11,6 +12,8 @@ struct LE_Button {
 
     bool hovered;
     bool held;
+
+    bool force_hovered;
 
     /* Percentage value from 0 -> 1. Transitions everytime the button is hovered/unhovered. This value influences `angle` which is the actual value you should use. */
     float angle_perc;
@@ -29,6 +32,15 @@ struct LE_Button {
 
 /* Initialize an LE_Button struct with default values. Please call this first. */
 void InitButton(struct LE_Button * const pLEButton);
+
+/* Navigate through an array of buttons. Basically imitates TAB/S-TAB behavior. */
+void Navigate(struct LE_Button * const * ppLEButtons, size_t button_count, bool backward);
+
+/* Activate a button that was activated by Navigate() */
+void PressActiveButton();
+
+/* Stop highlighting the following buttons that the user navigated to with Navigate(). Basically imitates what happens when you move your mouse. */
+void DisableNavigation();
 
 /* Steps in the button logic. */
 bool ButtonStep(struct LE_Button * const pLEButton, const struct MouseInfo * const pMouseInfo, const double * const pDelta);
