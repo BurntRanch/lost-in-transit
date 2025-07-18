@@ -30,19 +30,24 @@ struct LE_Button {
     void (*on_button_pressed)();
 };
 
-/* Initialize an LE_Button struct with default values. Please call this first. */
+/* Initialize an LE_Button struct with default values. Please call this first.
+ * Also adds the button to the registry, to be used with Navigate() and similar functions.
+ */
 void InitButton(struct LE_Button * const pLEButton);
 
-/* Navigate through an array of buttons. Basically imitates TAB/S-TAB behavior. */
-void Navigate(struct LE_Button * const * ppLEButtons, size_t button_count, bool backward);
+/* Navigate through all the buttons in the registry. Basically imitates TAB/S-TAB behavior. */
+void Navigate(bool backward);
 
 /* Activate a button that was activated by Navigate() */
 void PressActiveButton();
 
-/* Stop highlighting the following buttons that the user navigated to with Navigate(). Basically imitates what happens when you move your mouse. */
-void DisableNavigation();
+/* Stop highlighting the button that the user navigated to with Navigate(). Basically imitates what happens when you move your mouse. */
+void ResetNavigation();
 
 /* Steps in the button logic. */
 bool ButtonStep(struct LE_Button * const pLEButton, const struct MouseInfo * const pMouseInfo, const double * const pDelta);
+
+/* Clears the button registry. */
+void ClearButtonRegistry();
 
 #endif

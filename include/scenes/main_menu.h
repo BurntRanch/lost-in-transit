@@ -16,12 +16,6 @@ bool MainMenuInit(SDL_Renderer *pRenderer);
  */
 bool MainMenuRender(void);
 
-/* Handle a key down event. */
-bool MainMenuKeyDown(SDL_Scancode scancode, SDL_Keymod keymods);
-
-/* Called when the mouse moves.. */
-void MainMenuMouseMoved();
-
 /* Clean everything up. */
 void MainMenuCleanup(void);
 

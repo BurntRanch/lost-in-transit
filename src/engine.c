@@ -1,5 +1,7 @@
+#include "button.h"
 #include "scenes/game/intro.h"
 #include <SDL3/SDL_gpu.h>
+#include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_log.h>
 #define TITLE "Lost In Transit"
 
@@ -249,6 +251,8 @@ void LEScheduleLoadScene(const Uint8 scene) {
 }
 
 void LECleanupScene(void) {
+    ClearButtonRegistry();
+
     switch (scene_loaded) {
     case SCENE_MAINMENU:
         MainMenuCleanup();
@@ -300,24 +304,19 @@ bool LEStepRender(void) {
             LEScreenWidth = event.window.data1;
             LEScreenHeight = event.window.data2;
         } else if (event.type == SDL_EVENT_KEY_DOWN) {
-            /* Forward key event to scene */
-            switch (scene_loaded) {
-                case SCENE_MAINMENU:
-                    if (!MainMenuKeyDown(event.key.scancode, event.key.mod)) {
-                        return false;
-                    }
+            switch (event.key.scancode) {
+                case SDL_SCANCODE_TAB:
+                    Navigate(event.key.mod & SDL_KMOD_SHIFT);
                     break;
-                default:
-                    ;
-            } 
-        } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
-            switch (scene_loaded) {
-                case SCENE_MAINMENU:
-                    MainMenuMouseMoved();
+                case SDL_SCANCODE_SPACE:
+                case SDL_SCANCODE_RETURN:
+                    PressActiveButton();
                     break;
                 default:
                     ;
             }
+        } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
+            ResetNavigation();
         }
     }
 

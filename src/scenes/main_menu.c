@@ -160,31 +160,11 @@ bool MainMenuRender(void) {
     return true;
 }
 
-bool MainMenuKeyDown(SDL_Scancode scancode, SDL_Keymod keymods) {
-    switch (scancode) {
-        case SDL_SCANCODE_TAB:
-            Navigate((struct LE_Button *[3]){ &play_button, &options_button, &exit_button }, 3, keymods & SDL_KMOD_SHIFT);
-            break;
-        case SDL_SCANCODE_SPACE:
-        case SDL_SCANCODE_RETURN:
-            PressActiveButton();
-            break;
-        default:
-            ;
-    }
-
-    return true;
-}
-
-void MainMenuMouseMoved() {
-    DisableNavigation();
-}
-
 void MainMenuCleanup(void) {
     DestroyText(&title_label);
     DestroyText(&play_label);
     DestroyText(&options_label);
     DestroyText(&exit_label);
 
-    DisableNavigation();
+    ClearButtonRegistry();
 }
