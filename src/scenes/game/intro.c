@@ -325,8 +325,10 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
                 /* Create an array with as many 32's as we need to completely cover index_count. */
                 Sint32 *new_array = SDL_malloc(sizeof(Sint32) * new_array_size * 32);
 
-                SDL_memcpy(new_array, indices, sizeof(Sint32) * indices_size * 32);
-                SDL_free(indices);
+                if (indices) {
+                    SDL_memcpy(new_array, indices, sizeof(Sint32) * indices_size * 32);
+                    SDL_free(indices);
+                }
 
                 indices = new_array;
                 indices_size = new_array_size;
