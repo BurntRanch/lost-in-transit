@@ -315,6 +315,8 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
         last_list = last_list->prev;
     }
 
+    packet.server_handle = hello_packet->server_handle;
+
     if (!SRSendMessageToClients(&packet, sizeof(packet))) {
         return; /* how */
     }
