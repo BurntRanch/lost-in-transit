@@ -334,7 +334,7 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
                 indices_size = new_array_size;
             }
 
-            SDL_memcpy(&indices[index_count - (mesh->mFaces[face_idx].mNumIndices)], mesh->mFaces[face_idx].mIndices, mesh->mNumFaces * sizeof(Sint32));
+            SDL_memcpy(&indices[index_count - (mesh->mFaces[face_idx].mNumIndices)], mesh->mFaces[face_idx].mIndices, mesh->mFaces[face_idx].mNumIndices * sizeof(Sint32));
         }
 
         if (!CreateVertexBuffer(vertices, mesh->mNumVertices, &pObjectOut->vertex_buffers[mesh_idx])) {
@@ -381,11 +381,10 @@ static inline struct Object *EmplaceObject() {
 
 /* Recursively load all the objects in the scene */
 static inline bool LoadSceneObjects(const struct aiScene *scene, const struct aiNode *node) {
+    if (node->mNumMeshes > 0 && !LoadObject(scene, node, EmplaceObject())) {
+        return false;
+    }
     for (size_t i = 0; i < node->mNumChildren; i++) {
-        if (!LoadObject(scene, node, EmplaceObject())) {
-            return false;
-        }
-
         if (!LoadSceneObjects(scene, node->mChildren[i])) {
             return false;
         }
@@ -467,7 +466,7 @@ bool IntroRender(void) {
             SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_buffer_binding, 1);
             SDL_BindGPUIndexBuffer(render_pass, &index_buffer_binding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 
-            SDL_DrawGPUPrimitives(render_pass, obj->vertex_buffers[buf_idx].count, 1, 0, 0);
+            SDL_DrawGPUIndexedPrimitives(render_pass, obj->index_buffers[buf_idx].count, 1, 0, 0, 0);
         }
     }
 
