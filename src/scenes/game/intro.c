@@ -354,8 +354,8 @@ static inline size_t GetObjectsSize() {
 
 /* Make space for an extra object */
 static inline struct Object *EmplaceObject() {
-    /* Should we resize the array? True if we hit a multiple of 32. */
-    bool resize_array = objects_count % 32 == 0;
+    /* Should we resize the array? True if we surpass a multiple of 32. */
+    bool resize_array = objects_count % 33 == 0;
     
     objects_count++;
     if (resize_array) {
