@@ -52,6 +52,10 @@ void InitButton(struct LE_Button * const pLEButton) {
 }
 
 void Navigate(bool backward) {
+    if (button_registry_count == 0) {
+        return;
+    }
+
     if (selected_button_idx >= 0) {
         button_registry[selected_button_idx]->force_hovered = false;
     }
