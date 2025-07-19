@@ -318,7 +318,7 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
             index_count += mesh->mFaces[face_idx].mNumIndices;
 
             /* If the index count (including the new indices) outgrows the size of the array. */
-            if (index_count >= indices_size * 32) {
+            if (index_count > indices_size * 32) {
                 /* Calculate "how many 32's can completely cover index_count" */
                 size_t new_array_size = (int)SDL_ceilf((index_count + 1) / 32.f);
 
