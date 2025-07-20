@@ -1,8 +1,7 @@
-CC       	= gcc
-CXX			= g++
+CC      ?= gcc
+CXX	?= g++
 
-DEBUG 		?= 1
-
+DEBUG  	?= 1
 # https://stackoverflow.com/a/1079861
 # WAY easier way to build debug and release builds
 ifeq ($(DEBUG), 1)
@@ -26,18 +25,30 @@ SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
-LDFLAGS   	+= -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lassimp -lstdc++
+LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
+LDLIBS		+= -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lassimp -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
-CFLAGS        += -fvisibility=hidden -Iinclude -I/usr/local/include/GameNetworkingSockets $(VARS) -DVERSION=\"$(VERSION)\"
-CXXFLAGS	= $(CFLAGS)
-CFLAGS += --std=c23
+CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
+CXXFLAGS	 = $(CFLAGS)
 
-all: $(TARGET)
-$(TARGET): $(OBJ)
+all: gamenetworkingsockets $(TARGET)
+
+gamenetworkingsockets:
+ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.so),)
+	mkdir -p $(BUILDDIR)/GameNetworkingSockets
+	mkdir -p GameNetworkingSockets/build
+	cd GameNetworkingSockets && patch -p1 < ../fix-string_view-return.patch
+	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build
+	cmake --build GameNetworkingSockets/build
+	cd GameNetworkingSockets && patch -p1 -R < ../fix-string_view-return.patch
+	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.so $(BUILDDIR)
+endif
+
+$(TARGET): gamenetworkingsockets $(OBJ)
 	mkdir -p $(BUILDDIR)
-	$(CC) $(OBJ) -o $(BUILDDIR)/$(TARGET) $(LDFLAGS)
+	$(CC) $(OBJ) -o $(BUILDDIR)/$(TARGET) $(LDFLAGS) $(LDLIBS)
 
 clean:
 	rm -rf $(BUILDDIR)/$(TARGET) $(OBJ)
 
-.PHONY: $(TARGET) all
+.PHONY: $(TARGET) clean gamenetworkingsockets all
