@@ -8,7 +8,12 @@
 #include <stdbool.h>
 
 struct LE_Button {
-    struct LE_RenderElement *element;
+    struct LE_RenderElement {
+        SDL_Texture **texture;
+
+        /* Where this element is to be rendered. */
+        struct SDL_FRect dstrect;
+    } *element;
 
     bool hovered;
     bool held;
