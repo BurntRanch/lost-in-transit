@@ -6,7 +6,7 @@
 /* Initialize elements such as text, etc.
  * Returns true on success.
  */
-bool PlayInit(SDL_Renderer* pRenderer);
+bool PlayInit(SDL_Renderer *pRenderer);
 
 /* Render the play menu.
  * Returns true if all went well.

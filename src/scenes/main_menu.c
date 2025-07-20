@@ -22,7 +22,7 @@
 
 #define FIXED_UPDATE_TIME 0.016
 
-static SDL_Renderer* renderer = NULL;
+static SDL_Renderer *renderer = NULL;
 
 /*** Title Text ***/
 static struct LE_Label title_label;
@@ -51,7 +51,7 @@ static inline void OptionsButtonPressed() {
     LEScheduleLoadScene(SCENE_OPTIONS);
 }
 
-bool MainMenuInit(SDL_Renderer* pRenderer) {
+bool MainMenuInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
 
     if (!pLEGameFont) {
@@ -133,15 +133,15 @@ bool MainMenuRender(void) {
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture**)play_element.texture, NULL, &play_element.dstrect, play_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)play_element.texture, NULL, &play_element.dstrect, play_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Play button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture**)options_element.texture, NULL, &options_element.dstrect, options_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)options_element.texture, NULL, &options_element.dstrect, options_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Options button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture**)exit_element.texture, NULL, &exit_element.dstrect, exit_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)exit_element.texture, NULL, &exit_element.dstrect, exit_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Exit button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }

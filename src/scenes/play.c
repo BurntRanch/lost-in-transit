@@ -17,9 +17,9 @@
 
 #include <stdio.h>
 
-static SDL_Renderer* renderer = NULL;
+static SDL_Renderer *renderer = NULL;
 
-static struct SDL_Texture* back_texture;
+static struct SDL_Texture *back_texture;
 static struct LE_RenderElement back_element;
 static struct LE_Button back_button;
 
@@ -45,7 +45,7 @@ static inline void ConnectButtonPressed() {
     LEScheduleLoadScene(SCENE_LOBBY);
 }
 
-bool PlayInit(SDL_Renderer* pRenderer) {
+bool PlayInit(SDL_Renderer *pRenderer) {
     renderer = pRenderer;
 
     /* If we press back from the lobby menu, we want to stop the server and disconnect. */

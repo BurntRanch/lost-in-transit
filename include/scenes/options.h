@@ -6,7 +6,7 @@
 /* Initialize elements such as text, etc.
  * Returns true on success.
  */
-bool OptionsInit(SDL_Renderer* pRenderer);
+bool OptionsInit(SDL_Renderer *pRenderer);
 
 /* Render the options menu.
  * Returns true if all went well.

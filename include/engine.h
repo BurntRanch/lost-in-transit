@@ -7,15 +7,15 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include <stdbool.h>
 
-extern TTF_Font* pLEGameFont;
+extern TTF_Font *pLEGameFont;
 
 extern int LEScreenWidth, LEScreenHeight;
 
 extern double LEFrametime;
 
 /* Only used in 3D accelerated scenes. */
-extern SDL_GPUCommandBuffer* LECommandBuffer;
-extern SDL_GPUTexture* LESwapchainTexture;
+extern SDL_GPUCommandBuffer *LECommandBuffer;
+extern SDL_GPUTexture *LESwapchainTexture;
 extern Uint32 LESwapchainWidth, LESwapchainHeight;
 
 /* Returns true on success. */

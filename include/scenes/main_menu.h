@@ -9,7 +9,7 @@
 /* Initialize elements such as text, etc.
  * Returns true on success.
  */
-bool MainMenuInit(SDL_Renderer* pRenderer);
+bool MainMenuInit(SDL_Renderer *pRenderer);
 
 /* Render the main menu.
  * Returns true if all went well.

@@ -19,8 +19,8 @@
 #include <assimp/scene.h>
 
 struct Shader {
-    SDL_GPUShader* vertex;
-    SDL_GPUShader* fragment;
+    SDL_GPUShader *vertex;
+    SDL_GPUShader *fragment;
 };
 
 struct Vertex {
@@ -28,7 +28,7 @@ struct Vertex {
 };
 
 struct Buffer {
-    struct SDL_GPUBuffer* buffer;
+    struct SDL_GPUBuffer *buffer;
 
     /* amount of elements */
     size_t count;
@@ -40,24 +40,24 @@ struct Object {
     struct aiQuaternion rotation;
     struct aiVector3D scale;
 
-    struct Buffer* vertex_buffers;
-    struct Buffer* index_buffers;
+    struct Buffer *vertex_buffers;
+    struct Buffer *index_buffers;
 
     /* vertex_buffers and index_buffers are the same length */
     size_t buffers_count;
 };
 
-static SDL_GPUDevice* gpu_device = NULL;
+static SDL_GPUDevice *gpu_device = NULL;
 
 static struct Shader test_shader;
-static SDL_GPUGraphicsPipeline* test_pipeline = NULL;
+static SDL_GPUGraphicsPipeline *test_pipeline = NULL;
 
-static struct Object** objects_array = NULL;
+static struct Object **objects_array = NULL;
 static Uint32 objects_count = 0;
 
 /* Don't laugh */
-static inline bool LoadShader(const char* fileName, Uint8** ppBufferOut, size_t* pSizeOut) {
-    void* data = NULL;
+static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t *pSizeOut) {
+    void *data = NULL;
 
     if (!(data = SDL_LoadFile(fileName, pSizeOut))) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open shader file %s! (SDL Error: %s)\n", fileName, SDL_GetError());
@@ -82,7 +82,7 @@ static inline bool InitTestPipeline() {
     vertex_shader_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     vertex_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/test_shader.vert.spv", (Uint8**)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
         return false;
     }
 
@@ -97,7 +97,7 @@ static inline bool InitTestPipeline() {
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/test_shader.frag.spv", (Uint8**)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
         return false;
     }
 
@@ -110,8 +110,8 @@ static inline bool InitTestPipeline() {
         return false;
     }
 
-    SDL_free((void*)vertex_shader_create_info.code);
-    SDL_free((void*)fragment_shader_create_info.code);
+    SDL_free((void *)vertex_shader_create_info.code);
+    SDL_free((void *)fragment_shader_create_info.code);
 
     struct SDL_GPUColorTargetDescription color_target_description;
     color_target_description.blend_state.enable_color_write_mask = false;
@@ -178,8 +178,8 @@ static inline bool InitTestPipeline() {
     return true;
 }
 
-static inline bool CreateVertexBuffer(const struct Vertex* pVertices, size_t vertexCount, struct Buffer* pVertexBufferOut) {
-    SDL_GPUCopyPass* copy_pass;
+static inline bool CreateVertexBuffer(const struct Vertex *pVertices, size_t vertexCount, struct Buffer *pVertexBufferOut) {
+    SDL_GPUCopyPass *copy_pass;
 
     if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin GPU copy pass! (SDL Error: %s)\n", SDL_GetError());
@@ -196,7 +196,7 @@ static inline bool CreateVertexBuffer(const struct Vertex* pVertices, size_t ver
         return false;
     }
 
-    static SDL_GPUTransferBuffer* transfer_buffer = NULL;
+    static SDL_GPUTransferBuffer *transfer_buffer = NULL;
 
     SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
     transfer_buffer_create_info.props = 0;
@@ -208,7 +208,7 @@ static inline bool CreateVertexBuffer(const struct Vertex* pVertices, size_t ver
         return false;
     }
 
-    void* data = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, false);
+    void *data = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, false);
 
     SDL_memcpy(data, pVertices, vertex_buffer_create_info.size);
 
@@ -230,8 +230,8 @@ static inline bool CreateVertexBuffer(const struct Vertex* pVertices, size_t ver
     return true;
 }
 
-static inline bool CreateIndexBuffer(const Sint32* pIndices, size_t indexCount, struct Buffer* pIndexBufferOut) {
-    SDL_GPUCopyPass* copy_pass;
+static inline bool CreateIndexBuffer(const Sint32 *pIndices, size_t indexCount, struct Buffer *pIndexBufferOut) {
+    SDL_GPUCopyPass *copy_pass;
 
     if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin GPU copy pass! (SDL Error: %s)\n", SDL_GetError());
@@ -248,7 +248,7 @@ static inline bool CreateIndexBuffer(const Sint32* pIndices, size_t indexCount, 
         return false;
     }
 
-    static SDL_GPUTransferBuffer* transfer_buffer = NULL;
+    static SDL_GPUTransferBuffer *transfer_buffer = NULL;
 
     SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
     transfer_buffer_create_info.props = 0;
@@ -260,7 +260,7 @@ static inline bool CreateIndexBuffer(const Sint32* pIndices, size_t indexCount, 
         return false;
     }
 
-    void* data = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, false);
+    void *data = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, false);
 
     SDL_memcpy(data, pIndices, index_buffer_create_info.size);
 
@@ -283,24 +283,24 @@ static inline bool CreateIndexBuffer(const Sint32* pIndices, size_t indexCount, 
 }
 
 /* Create an Object out of an aiNode */
-static inline bool LoadObject(const struct aiScene* pScene, const struct aiNode* pNode, struct Object* pObjectOut) {
+static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode *pNode, struct Object *pObjectOut) {
     static size_t mesh_idx;
-    static struct aiMesh* mesh;
+    static struct aiMesh *mesh;
 
     aiDecomposeMatrix(&pNode->mTransformation, &pObjectOut->scale, &pObjectOut->rotation, &pObjectOut->position);
 
-    pObjectOut->vertex_buffers = SDL_malloc(sizeof(struct Buffer*) * pNode->mNumMeshes);
-    pObjectOut->index_buffers = SDL_malloc(sizeof(struct Buffer*) * pNode->mNumMeshes);
+    pObjectOut->vertex_buffers = SDL_malloc(sizeof(struct Buffer *) * pNode->mNumMeshes);
+    pObjectOut->index_buffers = SDL_malloc(sizeof(struct Buffer *) * pNode->mNumMeshes);
 
     pObjectOut->buffers_count = pNode->mNumMeshes;
 
     for (mesh_idx = 0; mesh_idx < pNode->mNumMeshes; mesh_idx++) {
         mesh = pScene->mMeshes[pNode->mMeshes[mesh_idx]];
 
-        struct Vertex* vertices = SDL_malloc(sizeof(struct Vertex) * mesh->mNumVertices);
+        struct Vertex *vertices = SDL_malloc(sizeof(struct Vertex) * mesh->mNumVertices);
 
         /* It's not easy to predict the size of this array beforehand, so we need to dynamically resize this array as needed. */
-        Sint32* indices = NULL;
+        Sint32 *indices = NULL;
 
         /* size of the array, grows in increments of 1, and should be multiplied by 32. */
         size_t indices_size = 0;
@@ -323,7 +323,7 @@ static inline bool LoadObject(const struct aiScene* pScene, const struct aiNode*
                 size_t new_array_size = (int)SDL_ceilf((index_count + 1) / 32.f);
 
                 /* Create an array with as many 32's as we need to completely cover index_count. */
-                Sint32* new_array = SDL_malloc(sizeof(Sint32) * new_array_size * 32);
+                Sint32 *new_array = SDL_malloc(sizeof(Sint32) * new_array_size * 32);
 
                 if (indices) {
                     SDL_memcpy(new_array, indices, sizeof(Sint32) * indices_size * 32);
@@ -355,13 +355,13 @@ static inline size_t GetObjectsSize() {
 }
 
 /* Make space for an extra object */
-static inline struct Object* EmplaceObject() {
+static inline struct Object *EmplaceObject() {
     /* Should we resize the array? True if we surpass a multiple of 32. */
     bool resize_array = objects_count % 33 == 0;
 
     objects_count++;
     if (resize_array) {
-        struct Object** new_array = SDL_malloc(sizeof(struct Object*) * GetObjectsSize());
+        struct Object **new_array = SDL_malloc(sizeof(struct Object *) * GetObjectsSize());
 
         if (objects_array) {
             /* Do this so that GetObjectsSize() is the old size */
@@ -380,7 +380,7 @@ static inline struct Object* EmplaceObject() {
 }
 
 /* Recursively load all the objects in the scene */
-static inline bool LoadSceneObjects(const struct aiScene* scene, const struct aiNode* node) {
+static inline bool LoadSceneObjects(const struct aiScene *scene, const struct aiNode *node) {
     if (node->mNumMeshes > 0 && !LoadObject(scene, node, EmplaceObject())) {
         return false;
     }
@@ -395,7 +395,7 @@ static inline bool LoadSceneObjects(const struct aiScene* scene, const struct ai
 
 /* Loads all the models and stuff necessary for the game! */
 static inline bool LoadScene() {
-    const struct aiScene* scene = aiImportFile("models/test.glb", 0);
+    const struct aiScene *scene = aiImportFile("models/test.glb", 0);
 
     if (!scene) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to import 'models/test.glb'!\n");
@@ -409,11 +409,11 @@ static inline bool LoadScene() {
     return true;
 }
 
-static void GoToMainMenu(const ConnectionHandle _, [[gnu::unused]] const char* const _pReason) {
+static void GoToMainMenu(const ConnectionHandle _, [[gnu::unused]] const char *const _pReason) {
     LEScheduleLoadScene(SCENE_MAINMENU);
 }
 
-bool IntroInit(SDL_GPUDevice* pGPUDevice) {
+bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     gpu_device = pGPUDevice;
 
     if (!InitTestPipeline()) {
@@ -438,7 +438,7 @@ bool IntroRender(void) {
     color_target_info.store_op = SDL_GPU_STOREOP_STORE;
     color_target_info.texture = LESwapchainTexture;
 
-    static SDL_GPURenderPass* render_pass;
+    static SDL_GPURenderPass *render_pass;
 
     SDL_GPUViewport viewport = {0, 0, LESwapchainWidth, LESwapchainHeight, 0.0f, 1.0f};
 
@@ -450,7 +450,7 @@ bool IntroRender(void) {
     SDL_BindGPUGraphicsPipeline(render_pass, test_pipeline);
     SDL_SetGPUViewport(render_pass, &viewport);
 
-    struct Object* obj;
+    struct Object *obj;
     for (size_t i = 0; i < objects_count; i++) {
         obj = objects_array[i];
 

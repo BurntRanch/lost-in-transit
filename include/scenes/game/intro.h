@@ -7,7 +7,7 @@
 /* Initialize elements such as text, etc.
  * Returns true on success.
  */
-bool IntroInit(SDL_GPUDevice* pGPUDevice);
+bool IntroInit(SDL_GPUDevice *pGPUDevice);
 
 /* Render the intro.
  * Returns true if all went well.

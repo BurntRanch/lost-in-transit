@@ -34,16 +34,16 @@
 #include <stdio.h>
 #include <time.h>
 
-TTF_Font* pLEGameFont = NULL;
+TTF_Font *pLEGameFont = NULL;
 
 /* Resolution defaults. */
 int LEScreenWidth = 800;
 int LEScreenHeight = 600;
 
-static SDL_Window* window = NULL;
-static SDL_Renderer* renderer = NULL;
+static SDL_Window *window = NULL;
+static SDL_Renderer *renderer = NULL;
 
-static SDL_GPUDevice* gpu_device = NULL;
+static SDL_GPUDevice *gpu_device = NULL;
 
 void LEDestroyWindow(void) {
     if (window) {
@@ -113,7 +113,7 @@ bool LEInitSteam(void) {
     return SRInitGNS();
 }
 
-void DestroyText(struct LE_Label* const pLEText) {
+void DestroyText(struct LE_Label *const pLEText) {
     if (pLEText->texture) {
         SDL_DestroyTexture(pLEText->texture);
         pLEText->texture = NULL;
@@ -125,7 +125,7 @@ void DestroyText(struct LE_Label* const pLEText) {
     }
 }
 
-bool UpdateText(struct LE_Label* const pLEText) {
+bool UpdateText(struct LE_Label *const pLEText) {
     DestroyText(pLEText);
 
     if (!(pLEText->surface = TTF_RenderText_Blended_Wrapped(pLEGameFont, pLEText->text, 0, (SDL_Color){255, 255, 255, SDL_ALPHA_OPAQUE}, 0))) {
@@ -277,8 +277,8 @@ static Uint64 now;
 
 double LEFrametime = 0.0;
 
-SDL_GPUCommandBuffer* LECommandBuffer = NULL;
-SDL_GPUTexture* LESwapchainTexture = NULL;
+SDL_GPUCommandBuffer *LECommandBuffer = NULL;
+SDL_GPUTexture *LESwapchainTexture = NULL;
 Uint32 LESwapchainWidth, LESwapchainHeight = 0;
 
 bool LEStepRender(void) {

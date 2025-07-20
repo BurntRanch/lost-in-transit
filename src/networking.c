@@ -49,21 +49,21 @@ struct TransitionPacket {
 
 struct PlayersLinkedList {
     /* Next element. NULL if this is the last element. */
-    struct PlayersLinkedList* next;
+    struct PlayersLinkedList *next;
 
     struct Player this;
 
     /* Previous element. NULL if this is the first element. */
-    struct PlayersLinkedList* prev;
+    struct PlayersLinkedList *prev;
 };
 
-static void (*server_disconnect_callback)(const ConnectionHandle, const char* const) = NULL;
-static void (*server_data_callback)(const ConnectionHandle, const void* const, const size_t) = NULL;
+static void (*server_disconnect_callback)(const ConnectionHandle, const char *const) = NULL;
+static void (*server_data_callback)(const ConnectionHandle, const void *const, const size_t) = NULL;
 static void (*server_connect_callback)(const ConnectionHandle) = NULL;
 
-static void (*client_disconnect_callback)(const ConnectionHandle, const char* const) = NULL;
-static void (*client_data_callback)(const ConnectionHandle, const void* const, const size_t) = NULL;
-static void (*client_join_callback)(const ConnectionHandle, const struct Player* const) = NULL;
+static void (*client_disconnect_callback)(const ConnectionHandle, const char *const) = NULL;
+static void (*client_data_callback)(const ConnectionHandle, const void *const, const size_t) = NULL;
+static void (*client_join_callback)(const ConnectionHandle, const struct Player *const) = NULL;
 static void (*client_leave_callback)(const ConnectionHandle, int) = NULL;
 static void (*client_connect_callback)(const ConnectionHandle) = NULL;
 
@@ -72,11 +72,11 @@ static struct Player client_self;
 /* Our connection to the server. */
 static ConnectionHandle client_connection;
 
-static struct PlayersLinkedList* server_players = NULL;
+static struct PlayersLinkedList *server_players = NULL;
 
 /* Creates a linked list object. You can append this to another linked list and so on. */
-static inline struct PlayersLinkedList* AllocPlayersLinkedList(const struct Player* const data) {
-    struct PlayersLinkedList* linked_list = malloc(sizeof(struct PlayersLinkedList));
+static inline struct PlayersLinkedList *AllocPlayersLinkedList(const struct Player *const data) {
+    struct PlayersLinkedList *linked_list = malloc(sizeof(struct PlayersLinkedList));
 
     linked_list->next = NULL;
     linked_list->prev = NULL;
@@ -86,7 +86,7 @@ static inline struct PlayersLinkedList* AllocPlayersLinkedList(const struct Play
 }
 
 /* if second is NULL, it will not do anything. */
-static inline void ConnectLinkedLists(struct PlayersLinkedList* first, struct PlayersLinkedList* second) {
+static inline void ConnectLinkedLists(struct PlayersLinkedList *first, struct PlayersLinkedList *second) {
     if (second == NULL) {
         return;
     }
@@ -95,7 +95,7 @@ static inline void ConnectLinkedLists(struct PlayersLinkedList* first, struct Pl
     second->prev = first;
 }
 
-static inline struct PlayersLinkedList* FindPlayerByHandle(struct PlayersLinkedList* list, const ConnectionHandle handle) {
+static inline struct PlayersLinkedList *FindPlayerByHandle(struct PlayersLinkedList *list, const ConnectionHandle handle) {
     if (!list) {
         return NULL;
     }
@@ -115,7 +115,7 @@ static inline struct PlayersLinkedList* FindPlayerByHandle(struct PlayersLinkedL
     return NULL;
 }
 
-static inline struct PlayersLinkedList* FindPlayerByID(struct PlayersLinkedList* list, const int id) {
+static inline struct PlayersLinkedList *FindPlayerByID(struct PlayersLinkedList *list, const int id) {
     if (!list) {
         return NULL;
     }
@@ -136,7 +136,7 @@ static inline struct PlayersLinkedList* FindPlayerByID(struct PlayersLinkedList*
 }
 
 /* Frees a single list item. Doesn't free any other siblings */
-static inline void FreeList(struct PlayersLinkedList* list) {
+static inline void FreeList(struct PlayersLinkedList *list) {
     if (!list) {
         return;
     }
@@ -151,7 +151,7 @@ static inline void FreeList(struct PlayersLinkedList* list) {
 }
 
 /* Frees the list and any other siblings. */
-static inline void FreeLists(struct PlayersLinkedList* list) {
+static inline void FreeLists(struct PlayersLinkedList *list) {
     if (!list) {
         return;
     }
@@ -161,42 +161,42 @@ static inline void FreeLists(struct PlayersLinkedList* list) {
     }
 
     while (list != NULL) {
-        struct PlayersLinkedList* next = list->next;
+        struct PlayersLinkedList *next = list->next;
         free(list);
         list = next;
     }
 }
 
-void NETSetServerDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char* const)) {
+void NETSetServerDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char *const)) {
     server_disconnect_callback = pCallback;
 }
 void NETSetServerConnectCallback(void (*pCallback)(const ConnectionHandle)) {
     server_connect_callback = pCallback;
 }
-void NETSetServerDataCallback(void (*pCallback)(const ConnectionHandle, const void* const, const size_t)) {
+void NETSetServerDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t)) {
     server_data_callback = pCallback;
 }
 
-void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char* const)) {
+void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char *const)) {
     client_disconnect_callback = pCallback;
 }
 void NETSetClientConnectCallback(void (*pCallback)(const ConnectionHandle)) {
     client_connect_callback = pCallback;
 }
-void NETSetClientJoinCallback(void (*pCallback)(const ConnectionHandle, const struct Player* const)) {
+void NETSetClientJoinCallback(void (*pCallback)(const ConnectionHandle, const struct Player *const)) {
     client_join_callback = pCallback;
 }
 void NETSetClientLeaveCallback(void (*pCallback)(const ConnectionHandle, int)) {
     client_leave_callback = pCallback;
 }
-void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const void* const, const size_t)) {
+void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t)) {
     client_data_callback = pCallback;
 }
 
-void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char* const pMessage) {
+void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char *const pMessage) {
     switch (role) {
         case NET_ROLE_SERVER:
-            struct PlayersLinkedList* player_list = FindPlayerByHandle(server_players, handle);
+            struct PlayersLinkedList *player_list = FindPlayerByHandle(server_players, handle);
 
             if (player_list) {
                 struct DisconnectPacket packet = {PACKET_TYPE_DISCONNECT, player_list->this.id};
@@ -262,7 +262,7 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle) {
  * There's no guarantee that the id will remain the same!! If a player already has the same ID, the ID will be changed to the first available ID.
  * In the rare case that we can't allocate an ID (if you can find 2147483647 players LMAO), this function will return null.
  */
-static inline struct PlayersLinkedList* AddPlayer(const ConnectionHandle handle, int id) {
+static inline struct PlayersLinkedList *AddPlayer(const ConnectionHandle handle, int id) {
     if (server_players && FindPlayerByID(server_players, id)) {
         id = 0;
         while (FindPlayerByID(server_players, id) && id < INT_MAX) {
@@ -275,7 +275,7 @@ static inline struct PlayersLinkedList* AddPlayer(const ConnectionHandle handle,
     }
 
     struct Player player = {handle, id};
-    struct PlayersLinkedList* player_list = AllocPlayersLinkedList(&player);
+    struct PlayersLinkedList *player_list = AllocPlayersLinkedList(&player);
 
     ConnectLinkedLists(player_list, server_players);
     server_players = player_list;
@@ -283,8 +283,8 @@ static inline struct PlayersLinkedList* AddPlayer(const ConnectionHandle handle,
     return player_list;
 }
 
-static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const struct HelloPacket* const hello_packet) {
-    struct PlayersLinkedList* player_list = AddPlayer(handle, hello_packet->id);
+static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const struct HelloPacket *const hello_packet) {
+    struct PlayersLinkedList *player_list = AddPlayer(handle, hello_packet->id);
 
     if (!player_list) {
         /* there's no way we reached 2147483647 players */
@@ -292,7 +292,7 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
         return;
     }
 
-    struct PlayersLinkedList* last_list = server_players;
+    struct PlayersLinkedList *last_list = server_players;
     while (last_list->next) {
         last_list = last_list->next;
     }
@@ -324,7 +324,7 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
     printf("Player (Server Authoritative ID: %d) (Client Requested ID: %d) signed in!\n", player_list->this.id, hello_packet->id);
 }
 
-static inline void Client_HandleHelloPacket(const ConnectionHandle handle, const struct HelloPacket* const hello_packet) {
+static inline void Client_HandleHelloPacket(const ConnectionHandle handle, const struct HelloPacket *const hello_packet) {
     if (hello_packet->server_handle == handle) {
         client_self.handle = handle;
         client_self.id = hello_packet->id;
@@ -341,26 +341,26 @@ static inline void Client_HandleHelloPacket(const ConnectionHandle handle, const
     }
 }
 
-static inline void Client_HandleDisconnectPacket(const ConnectionHandle handle, const struct DisconnectPacket* const disconnect_packet) {
+static inline void Client_HandleDisconnectPacket(const ConnectionHandle handle, const struct DisconnectPacket *const disconnect_packet) {
     if (client_leave_callback) {
         client_leave_callback(handle, disconnect_packet->id);
     }
 }
 
-static void HandlePacket(const enum Role role, const ConnectionHandle handle, const void* const data, const size_t size) {
+static void HandlePacket(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size) {
     if (size < sizeof(enum PacketType)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[ROLE %d]: Received malformed packet! (size < uint32)\n", role);
         return; /* why */
     }
 
-    switch (*(enum PacketType*)data) {
+    switch (*(enum PacketType *)data) {
         case PACKET_TYPE_HELLO:
             if (size < sizeof(struct HelloPacket)) {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[ROLE %d]: Received malformed packet! (size < sizeof(struct HelloPacket))\n", role);
                 return;
             }
 
-            const struct HelloPacket* const hello_packet = data;
+            const struct HelloPacket *const hello_packet = data;
 
             switch (role) {
                 case NET_ROLE_SERVER:
@@ -380,14 +380,14 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
                 return;
             }
 
-            const struct DisconnectPacket* const disconnect_packet = data;
+            const struct DisconnectPacket *const disconnect_packet = data;
 
             /* this only comes from the server so we assume NET_ROLE_CLIENT */
             Client_HandleDisconnectPacket(handle, disconnect_packet);
             break;
         case PACKET_TYPE_REQUEST_START:
             /* There's no data, all we need to know is that this client requested to start the match. */
-            struct PlayersLinkedList* player = FindPlayerByHandle(server_players, handle);
+            struct PlayersLinkedList *player = FindPlayerByHandle(server_players, handle);
             if (!player) {
                 fprintf(stderr, "Unknown player tried starting the game!\n");
                 return;
@@ -411,7 +411,7 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
                 return;
             }
 
-            const struct TransitionPacket* transition_packet = data;
+            const struct TransitionPacket *transition_packet = data;
 
             switch (transition_packet->dest) {
                 case TRANS_DEST_INTRO:
@@ -428,7 +428,7 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
     }
 }
 
-void NETHandleData(const enum Role role, const ConnectionHandle handle, const void* const data, const size_t size) {
+void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size) {
     HandlePacket(role, handle, data, size);
 
     switch (role) {
@@ -449,7 +449,7 @@ void NETHandleData(const enum Role role, const ConnectionHandle handle, const vo
     }
 }
 
-void NETHandleConnectionFailure(const char* const pReason) {
+void NETHandleConnectionFailure(const char *const pReason) {
     fprintf(stderr, "Failed to connect to server! (reason: %s)\n", pReason ? pReason : "unexpected error");
 
     if (client_disconnect_callback) {
