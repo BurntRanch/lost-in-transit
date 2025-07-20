@@ -32,7 +32,7 @@ int main() {
 
     TTF_CloseFont(pLEGameFont);
     pLEGameFont = NULL;
-    
+
     LECleanupScene();
     LEDestroyWindow();
     SRStopServer();

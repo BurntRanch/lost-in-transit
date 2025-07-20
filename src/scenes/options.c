@@ -9,14 +9,14 @@
 #include <SDL3/SDL_render.h>
 #include <stdio.h>
 
-static SDL_Renderer *renderer = NULL;
+static SDL_Renderer* renderer = NULL;
 
 static struct LE_Label title_label;
-static struct SDL_FRect title_dstrect = { 0, 0, 0, 0 };
+static struct SDL_FRect title_dstrect = {0, 0, 0, 0};
 
 static double time_elapsed;
 
-bool OptionsInit(SDL_Renderer *pRenderer) {
+bool OptionsInit(SDL_Renderer* pRenderer) {
     renderer = pRenderer;
 
     time_elapsed = 0.0;

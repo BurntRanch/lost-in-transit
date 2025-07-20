@@ -9,11 +9,11 @@
 
 struct LE_Button {
     struct LE_RenderElement {
-        SDL_Texture **texture;
+        SDL_Texture** texture;
 
         /* Where this element is to be rendered. */
         struct SDL_FRect dstrect;
-    } *element;
+    }* element;
 
     bool hovered;
     bool held;
@@ -38,7 +38,7 @@ struct LE_Button {
 /* Initialize an LE_Button struct with default values. Please call this first.
  * Also adds the button to the registry, to be used with Navigate() and similar functions.
  */
-void InitButton(struct LE_Button * const pLEButton);
+void InitButton(struct LE_Button* const pLEButton);
 
 /* Navigate through all the buttons in the registry. Basically imitates TAB/S-TAB behavior. */
 void Navigate(bool backward);
@@ -50,7 +50,7 @@ void PressActiveButton();
 void ResetNavigation();
 
 /* Steps in the button logic. */
-bool ButtonStep(struct LE_Button * const pLEButton, const struct MouseInfo * const pMouseInfo, const double * const pDelta);
+bool ButtonStep(struct LE_Button* const pLEButton, const struct MouseInfo* const pMouseInfo, const double* const pDelta);
 
 /* Clears the button registry. */
 void ClearButtonRegistry();

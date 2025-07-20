@@ -22,7 +22,7 @@
 
 #define FIXED_UPDATE_TIME 0.016
 
-static SDL_Renderer *renderer = NULL;
+static SDL_Renderer* renderer = NULL;
 
 /*** Title Text ***/
 static struct LE_Label title_label;
@@ -51,7 +51,7 @@ static inline void OptionsButtonPressed() {
     LEScheduleLoadScene(SCENE_OPTIONS);
 }
 
-bool MainMenuInit(SDL_Renderer *pRenderer) {
+bool MainMenuInit(SDL_Renderer* pRenderer) {
     renderer = pRenderer;
 
     if (!pLEGameFont) {
@@ -67,7 +67,6 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
     title_dstrect.w = title_label.surface->w;
     title_dstrect.h = title_label.surface->h;
 
-
     play_label.text = "Play!";
     if (!UpdateText(&play_label)) {
         return false;
@@ -79,8 +78,7 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
     InitButton(&play_button);
     play_button.element = &play_element;
     play_button.on_button_pressed = PlayButtonPressed;
-    play_button.inactive_color_mod = (SDL_Color){ 200, 100, 100, 0 };
-
+    play_button.inactive_color_mod = (SDL_Color){200, 100, 100, 0};
 
     options_label.text = "Options";
     if (!UpdateText(&options_label)) {
@@ -94,8 +92,7 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
     InitButton(&options_button);
     options_button.element = &options_element;
     options_button.on_button_pressed = OptionsButtonPressed;
-    options_button.inactive_color_mod = (SDL_Color){ 100, 200, 100, 0 };
-
+    options_button.inactive_color_mod = (SDL_Color){100, 200, 100, 0};
 
     exit_label.text = "Exit";
     if (!UpdateText(&exit_label)) {
@@ -108,7 +105,7 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
 
     InitButton(&exit_button);
     exit_button.element = &exit_element;
-    exit_button.inactive_color_mod = (SDL_Color){ 100, 100, 200, 0 };
+    exit_button.inactive_color_mod = (SDL_Color){100, 100, 200, 0};
 
     return true;
 }
@@ -116,10 +113,10 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
 bool MainMenuRender(void) {
     play_element.dstrect.x = LEScreenWidth * 0.0225;
     play_element.dstrect.y = LEScreenHeight * 0.25;
-    
+
     options_element.dstrect.x = LEScreenWidth * 0.0225;
     options_element.dstrect.y = SDL_max(LEScreenHeight * 0.35, play_element.dstrect.y + play_element.dstrect.h + 5);
-    
+
     exit_element.dstrect.x = LEScreenWidth * 0.0225;
     exit_element.dstrect.y = SDL_max(LEScreenHeight * 0.45, options_element.dstrect.y + options_element.dstrect.h + 5);
 
@@ -136,19 +133,19 @@ bool MainMenuRender(void) {
         return false;
     }
 
-    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)play_element.texture, NULL, &play_element.dstrect, play_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture**)play_element.texture, NULL, &play_element.dstrect, play_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Play button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)options_element.texture, NULL, &options_element.dstrect, options_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture**)options_element.texture, NULL, &options_element.dstrect, options_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Options button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture **)exit_element.texture, NULL, &exit_element.dstrect, exit_button.angle, NULL, SDL_FLIP_NONE)) {
+    if (!SDL_RenderTextureRotated(renderer, *(SDL_Texture**)exit_element.texture, NULL, &exit_element.dstrect, exit_button.angle, NULL, SDL_FLIP_NONE)) {
         fprintf(stderr, "Failed to draw the Exit button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    
+
     title_dstrect.x = LEScreenWidth * 0.0125;
     title_dstrect.y = LEScreenHeight * 0.0125;
 

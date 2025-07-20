@@ -17,9 +17,9 @@
 
 #include <stdio.h>
 
-static SDL_Renderer *renderer = NULL;
+static SDL_Renderer* renderer = NULL;
 
-static struct SDL_Texture *back_texture;
+static struct SDL_Texture* back_texture;
 static struct LE_RenderElement back_element;
 static struct LE_Button back_button;
 
@@ -45,7 +45,7 @@ static inline void ConnectButtonPressed() {
     LEScheduleLoadScene(SCENE_LOBBY);
 }
 
-bool PlayInit(SDL_Renderer *pRenderer) {
+bool PlayInit(SDL_Renderer* pRenderer) {
     renderer = pRenderer;
 
     /* If we press back from the lobby menu, we want to stop the server and disconnect. */
@@ -78,7 +78,7 @@ bool PlayInit(SDL_Renderer *pRenderer) {
     host_button.max_angle = 2.5f;
     host_button.element = &host_element;
     host_button.on_button_pressed = HostButtonPressed;
-    host_button.inactive_color_mod = (SDL_Color) { 200, 100, 100, 0 };
+    host_button.inactive_color_mod = (SDL_Color){200, 100, 100, 0};
 
     connect_label.text = "Connect to server";
     if (!UpdateText(&connect_label)) {
@@ -93,7 +93,7 @@ bool PlayInit(SDL_Renderer *pRenderer) {
     connect_button.max_angle = -2.5f;
     connect_button.element = &connect_element;
     connect_button.on_button_pressed = ConnectButtonPressed;
-    connect_button.inactive_color_mod = (SDL_Color){ 100, 100, 200, 0 };
+    connect_button.inactive_color_mod = (SDL_Color){100, 100, 200, 0};
 
     return true;
 }

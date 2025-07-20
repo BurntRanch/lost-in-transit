@@ -23,41 +23,41 @@
 
 /* Linked list holding a players id and label */
 struct PlayerLabelsList {
-    struct PlayerLabelsList *prev;
+    struct PlayerLabelsList* prev;
 
     int id;
     struct LE_Label label;
     struct LE_RenderElement element;
 
-    struct PlayerLabelsList *next;
+    struct PlayerLabelsList* next;
 };
 
 bool lobby_is_hosting = false;
 
 /* the IP address */
-static char *ip = NULL;
+static char* ip = NULL;
 
-static SDL_Renderer *renderer = NULL;
+static SDL_Renderer* renderer = NULL;
 
 /* Box holding a list of players */
-static struct SDL_Texture *box_texture;
+static struct SDL_Texture* box_texture;
 static struct LE_RenderElement box_element;
 
 /* The actual list of players */
-static struct PlayerLabelsList *players_list;
+static struct PlayerLabelsList* players_list;
 
-static struct SDL_Texture *back_texture;
+static struct SDL_Texture* back_texture;
 static struct LE_RenderElement back_element;
 static struct LE_Button back_button;
 
-static struct SDL_Texture *start_texture;
+static struct SDL_Texture* start_texture;
 static struct LE_RenderElement start_element;
 static struct LE_Button start_button;
 
 static struct LE_Label status_label;
 static struct SDL_FRect status_dstrect;
 
-static struct SDL_Texture *copy_texture;
+static struct SDL_Texture* copy_texture;
 static struct LE_RenderElement copy_element;
 static struct LE_Button copy_button;
 
@@ -66,8 +66,8 @@ static bool copy_button_apply_effect = false;
 
 static bool should_quit = false;
 
-static struct PlayerLabelsList *AllocPlayerLabelsList() {
-    struct PlayerLabelsList *list = SDL_malloc(sizeof(struct PlayerLabelsList));
+static struct PlayerLabelsList* AllocPlayerLabelsList() {
+    struct PlayerLabelsList* list = SDL_malloc(sizeof(struct PlayerLabelsList));
 
     list->prev = NULL;
 
@@ -81,7 +81,7 @@ static struct PlayerLabelsList *AllocPlayerLabelsList() {
 }
 
 /* Disconnect list from its siblings */
-static void DisconnectPlayerLabelsList(struct PlayerLabelsList *list) {
+static void DisconnectPlayerLabelsList(struct PlayerLabelsList* list) {
     if (!list) {
         return;
     }
@@ -93,7 +93,7 @@ static void DisconnectPlayerLabelsList(struct PlayerLabelsList *list) {
 }
 
 /* first must be non-null, second can be null (nothing will happen) */
-static void ConnectPlayerLabelsList(struct PlayerLabelsList *first, struct PlayerLabelsList *second) {
+static void ConnectPlayerLabelsList(struct PlayerLabelsList* first, struct PlayerLabelsList* second) {
     if (!first) {
         return;
     }
@@ -110,7 +110,7 @@ static void ConnectPlayerLabelsList(struct PlayerLabelsList *first, struct Playe
     return;
 }
 
-static void FreePlayerLabelsList(struct PlayerLabelsList *list) {
+static void FreePlayerLabelsList(struct PlayerLabelsList* list) {
     if (!list) {
         return;
     }
@@ -121,8 +121,8 @@ static void FreePlayerLabelsList(struct PlayerLabelsList *list) {
 }
 
 /* Add a new player to the list we have. */
-static void AddPlayerToList(const ConnectionHandle _, const struct Player *player) {
-    struct PlayerLabelsList *list = AllocPlayerLabelsList();
+static void AddPlayerToList(const ConnectionHandle _, const struct Player* player) {
+    struct PlayerLabelsList* list = AllocPlayerLabelsList();
 
     list->id = player->id;
     SDL_asprintf(&list->label.text, "ID: %d", player->id);
@@ -137,7 +137,7 @@ static void AddPlayerToList(const ConnectionHandle _, const struct Player *playe
     if (!players_list) {
         players_list = list;
     } else {
-        struct PlayerLabelsList *last_list = players_list;
+        struct PlayerLabelsList* last_list = players_list;
 
         while (last_list->next) {
             last_list = last_list->next;
@@ -147,7 +147,7 @@ static void AddPlayerToList(const ConnectionHandle _, const struct Player *playe
     }
 }
 static void RemovePlayerFromList(const ConnectionHandle _, int id) {
-    struct PlayerLabelsList *list = players_list;
+    struct PlayerLabelsList* list = players_list;
     while (list && list->id != id) {
         list = list->next;
     }
@@ -168,7 +168,7 @@ static void UpdateStatusConnected(const ConnectionHandle _) {
     status_dstrect.w = 0;
     status_dstrect.h = 0;
 }
-static void UpdateStatusDisconnected(const ConnectionHandle _, const char * const pReason) {
+static void UpdateStatusDisconnected(const ConnectionHandle _, const char* const pReason) {
     if (pReason) {
         snprintf(status_label.text, 256, "%s", pReason);
     } else {
@@ -203,7 +203,7 @@ static inline void StartButtonPressed() {
     NETRequestStart();
 }
 
-bool LobbyInit(SDL_Renderer *pRenderer) {
+bool LobbyInit(SDL_Renderer* pRenderer) {
     renderer = pRenderer;
 
     if (!(box_texture = IMG_LoadTexture(renderer, "images/box.png"))) {
@@ -319,7 +319,7 @@ bool LobbyRender(void) {
     box_element.dstrect.h = SDL_min((*box_element.texture)->h + (LEScreenHeight * 0.35), LEScreenHeight - (status_dstrect.y + status_dstrect.h) - 5);
     box_element.dstrect.x = LEScreenWidth * 0.5 - box_element.dstrect.w * 0.5;
     box_element.dstrect.y = SDL_max(LEScreenHeight * 0.5 - box_element.dstrect.h * 0.5, status_dstrect.y + status_dstrect.h);
-    
+
     if (lobby_is_hosting) {
         copy_element.dstrect.x = status_dstrect.w + status_dstrect.x;
         copy_element.dstrect.y = status_dstrect.y;
@@ -327,7 +327,7 @@ bool LobbyRender(void) {
 
     struct MouseInfo mouse_info;
     mouse_info.state = SDL_GetMouseState(&mouse_info.x, &mouse_info.y);
-    
+
     if (!ButtonStep(&back_button, &mouse_info, &LEFrametime)) {
         return false;
     }
@@ -381,7 +381,7 @@ bool LobbyRender(void) {
             return false;
         }
 
-        struct PlayerLabelsList *list = players_list;
+        struct PlayerLabelsList* list = players_list;
         size_t i = 0;
         while (list) {
             list->element.dstrect.x = box_element.dstrect.x + 30;
@@ -401,7 +401,7 @@ bool LobbyRender(void) {
 
 void LobbyCleanup(void) {
     while (players_list) {
-        struct PlayerLabelsList *list = players_list;
+        struct PlayerLabelsList* list = players_list;
         players_list = players_list->next;
 
         DestroyText(&list->label);

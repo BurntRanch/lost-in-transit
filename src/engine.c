@@ -34,16 +34,16 @@
 #include <stdio.h>
 #include <time.h>
 
-TTF_Font *pLEGameFont = NULL;
+TTF_Font* pLEGameFont = NULL;
 
 /* Resolution defaults. */
 int LEScreenWidth = 800;
 int LEScreenHeight = 600;
 
-static SDL_Window *window = NULL;
-static SDL_Renderer *renderer = NULL;
+static SDL_Window* window = NULL;
+static SDL_Renderer* renderer = NULL;
 
-static SDL_GPUDevice *gpu_device = NULL;
+static SDL_GPUDevice* gpu_device = NULL;
 
 void LEDestroyWindow(void) {
     if (window) {
@@ -75,7 +75,7 @@ bool LEInitWindow(void) {
             SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Something went wrong while getting a surface! (SDL Error: %s)\n", SDL_GetError());
             return false;
         }
-        
+
         if (!(renderer = SDL_GetRenderer(window))) {
             SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting the renderer! (SDL Error: %s)\n", SDL_GetError());
             return false;
@@ -113,7 +113,7 @@ bool LEInitSteam(void) {
     return SRInitGNS();
 }
 
-void DestroyText(struct LE_Label * const pLEText) {
+void DestroyText(struct LE_Label* const pLEText) {
     if (pLEText->texture) {
         SDL_DestroyTexture(pLEText->texture);
         pLEText->texture = NULL;
@@ -125,10 +125,10 @@ void DestroyText(struct LE_Label * const pLEText) {
     }
 }
 
-bool UpdateText(struct LE_Label * const pLEText) {
+bool UpdateText(struct LE_Label* const pLEText) {
     DestroyText(pLEText);
 
-    if (!(pLEText->surface = TTF_RenderText_Blended_Wrapped(pLEGameFont, pLEText->text, 0, (SDL_Color){255,255,255,SDL_ALPHA_OPAQUE}, 0))) {
+    if (!(pLEText->surface = TTF_RenderText_Blended_Wrapped(pLEGameFont, pLEText->text, 0, (SDL_Color){255, 255, 255, SDL_ALPHA_OPAQUE}, 0))) {
         fprintf(stderr, "Failed to render text! (text: %s) (SDL Error Code: %s)\n", pLEText->text, SDL_GetError());
         return false;
     }
@@ -211,33 +211,32 @@ bool LELoadScene(const Uint8 scene) {
     LECleanupScene();
 
     switch (scene) {
-    case SCENE_MAINMENU:
-        if (!StopGPUDevice() || !MainMenuInit(renderer)) {
-            return false;
-        }
-        break;
-    case SCENE_OPTIONS:
-        if (!StopGPUDevice() || !OptionsInit(renderer)) {
-            return false;
-        }
-        break;
-    case SCENE_PLAY:
-        if (!StopGPUDevice() || !PlayInit(renderer)) {
-            return false;
-        }
-        break;
-    case SCENE_LOBBY:
-        if (!StopGPUDevice() || !LobbyInit(renderer)) {
-            return false;
-        }
-        break;
-    case SCENE3D_INTRO:
-        if (!StartGPUDevice() || !IntroInit(gpu_device)) {
-            return false;
-        }
-        break;
-    default:
-        ;
+        case SCENE_MAINMENU:
+            if (!StopGPUDevice() || !MainMenuInit(renderer)) {
+                return false;
+            }
+            break;
+        case SCENE_OPTIONS:
+            if (!StopGPUDevice() || !OptionsInit(renderer)) {
+                return false;
+            }
+            break;
+        case SCENE_PLAY:
+            if (!StopGPUDevice() || !PlayInit(renderer)) {
+                return false;
+            }
+            break;
+        case SCENE_LOBBY:
+            if (!StopGPUDevice() || !LobbyInit(renderer)) {
+                return false;
+            }
+            break;
+        case SCENE3D_INTRO:
+            if (!StartGPUDevice() || !IntroInit(gpu_device)) {
+                return false;
+            }
+            break;
+        default:;
     }
 
     scene_loaded = scene;
@@ -254,23 +253,22 @@ void LECleanupScene(void) {
     ClearButtonRegistry();
 
     switch (scene_loaded) {
-    case SCENE_MAINMENU:
-        MainMenuCleanup();
-        break;
-    case SCENE_OPTIONS:
-        OptionsCleanup();
-        break;
-    case SCENE_PLAY:
-        PlayCleanup();
-        break;
-    case SCENE_LOBBY:
-        LobbyCleanup();
-        break;
-    case SCENE3D_INTRO:
-        IntroCleanup();
-        break;
-    default:
-        ;
+        case SCENE_MAINMENU:
+            MainMenuCleanup();
+            break;
+        case SCENE_OPTIONS:
+            OptionsCleanup();
+            break;
+        case SCENE_PLAY:
+            PlayCleanup();
+            break;
+        case SCENE_LOBBY:
+            LobbyCleanup();
+            break;
+        case SCENE3D_INTRO:
+            IntroCleanup();
+            break;
+        default:;
     }
 }
 
@@ -279,8 +277,8 @@ static Uint64 now;
 
 double LEFrametime = 0.0;
 
-SDL_GPUCommandBuffer *LECommandBuffer = NULL;
-SDL_GPUTexture *LESwapchainTexture = NULL;
+SDL_GPUCommandBuffer* LECommandBuffer = NULL;
+SDL_GPUTexture* LESwapchainTexture = NULL;
 Uint32 LESwapchainWidth, LESwapchainHeight = 0;
 
 bool LEStepRender(void) {
@@ -312,8 +310,7 @@ bool LEStepRender(void) {
                 case SDL_SCANCODE_RETURN:
                     PressActiveButton();
                     break;
-                default:
-                    ;
+                default:;
             }
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
@@ -332,36 +329,35 @@ bool LEStepRender(void) {
             return false;
         }
     }
-    
+
     /* call the right render function for whatever scene we're running right now */
     switch (scene_loaded) {
-    case SCENE_MAINMENU:
-        if (!MainMenuRender()) {
-            return false;
-        }
-        break;
-    case SCENE_OPTIONS:
-        if (!OptionsRender()) {
-            return false;
-        }
-        break;
-    case SCENE_PLAY:
-        if (!PlayRender()) {
-            return false;
-        }
-        break;
-    case SCENE_LOBBY:
-        if (!LobbyRender()) {
-            return false;
-        }
-        break;
-    case SCENE3D_INTRO:
-        if (!IntroRender()) {
-            return false;
-        }
-        break;
-    default:
-        ;
+        case SCENE_MAINMENU:
+            if (!MainMenuRender()) {
+                return false;
+            }
+            break;
+        case SCENE_OPTIONS:
+            if (!OptionsRender()) {
+                return false;
+            }
+            break;
+        case SCENE_PLAY:
+            if (!PlayRender()) {
+                return false;
+            }
+            break;
+        case SCENE_LOBBY:
+            if (!LobbyRender()) {
+                return false;
+            }
+            break;
+        case SCENE3D_INTRO:
+            if (!IntroRender()) {
+                return false;
+            }
+            break;
+        default:;
     }
 
     if (!is_using_gpu) {
@@ -371,7 +367,7 @@ bool LEStepRender(void) {
             return false;
         }
     }
-    
+
     LEFrametime = (now - last_frame_time) / 1000000000.0;
 
     last_frame_time = now;
