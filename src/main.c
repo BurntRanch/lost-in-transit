@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "scenes.h"
+#include "options.h"
 #include "steam.hh"
 
 #include <SDL3/SDL_error.h>
@@ -11,7 +12,8 @@
 #include <stdio.h>
 
 int main() {
-    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+    /* Initializes the options with default values (or whatever's in the config file (WIP)) */
+    InitOptions();
 
     if (!LEInitWindow() || !LEInitTTF() || !LEInitSteam())
         return 1;
@@ -27,7 +29,7 @@ int main() {
 
     // double frametime;
     while (LEStepRender()) {
-        // printf("frametime: %fms (%ld FPS)\n", LEFrametime * 1000, SDL_lround(1 / LEFrametime));
+        printf("frametime: %fms (%ld FPS)\n", LEFrametime * 1000, SDL_lround(1 / LEFrametime));
     }
 
     TTF_CloseFont(pLEGameFont);

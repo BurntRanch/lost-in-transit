@@ -17,7 +17,7 @@ static SDL_Renderer *renderer = NULL;
 
 static struct LE_Label option_vsync_label;
 static struct LE_RenderElement option_vsync_element;
-static struct LE_Button option_vsync_button;
+
 static struct SDL_Texture *checkbox_option_vsync_texture;
 static struct LE_RenderElement checkbox_option_vsync_element;
 static struct LE_Button checkbox_option_vsync_button;
@@ -34,6 +34,8 @@ const char *checkbox_image;
 
 static inline void OptionVsyncButtonPressed() {
     options.vsync = !options.vsync;
+
+    SDL_DestroyTexture(checkbox_option_vsync_texture);
     checkbox_image = options.vsync ? "images/checkbox_true.png" : "images/checkbox_false.png";
     if (!(checkbox_option_vsync_texture = IMG_LoadTexture(renderer, checkbox_image))) {
         fprintf(stderr, "Failed to load '%s'! (SDL Error Code: %s)\n", checkbox_image, SDL_GetError());
@@ -60,7 +62,7 @@ bool OptionsInit(SDL_Renderer *pRenderer) {
     back_button.on_button_pressed = BackButtonPressed;
 
     // Vsync option
-    option_vsync_label.text = "Enable Vsync (useless)";
+    option_vsync_label.text = "Vertical Sync";
     if (!UpdateText(&option_vsync_label)) {
         return false;
     }
@@ -69,11 +71,6 @@ bool OptionsInit(SDL_Renderer *pRenderer) {
     option_vsync_element.dstrect.w = option_vsync_label.surface->w;
     option_vsync_element.dstrect.h = option_vsync_label.surface->h;
 
-    InitButton(&option_vsync_button);
-    option_vsync_button.max_angle = -2.5f;
-    option_vsync_button.element = &option_vsync_element;
-    SDL_SetTextureColorMod(*option_vsync_button.element->texture, 100, 100, 200);
-
     // Check box (option_vsync)
     checkbox_image = options.vsync ? "images/checkbox_true.png" : "images/checkbox_false.png";
     if (!(checkbox_option_vsync_texture = IMG_LoadTexture(renderer, checkbox_image))) {
@@ -81,8 +78,8 @@ bool OptionsInit(SDL_Renderer *pRenderer) {
         return false;
     }
     checkbox_option_vsync_element.texture = &checkbox_option_vsync_texture;
-    checkbox_option_vsync_element.dstrect.w = (*checkbox_option_vsync_element.texture)->w / 5.5f;
-    checkbox_option_vsync_element.dstrect.h = (*checkbox_option_vsync_element.texture)->h / 5.5f;
+    checkbox_option_vsync_element.dstrect.w = option_vsync_element.dstrect.h + 12;
+    checkbox_option_vsync_element.dstrect.h = option_vsync_element.dstrect.h + 12;
 
     InitButton(&checkbox_option_vsync_button);
     checkbox_option_vsync_button.max_angle = -10.0f;
@@ -97,9 +94,9 @@ bool OptionsRender(void) {
     back_element.dstrect.y = LEScreenHeight * 0.0125f;
 
     option_vsync_element.dstrect.x = SDL_max((LEScreenWidth * 0.25) - (option_vsync_element.dstrect.w / 2), 0);
-    option_vsync_element.dstrect.y = SDL_max((LEScreenHeight * 0.2) - (option_vsync_element.dstrect.h / 2), 0);
-    checkbox_option_vsync_element.dstrect.x = option_vsync_element.dstrect.x * 8.0f;
-    checkbox_option_vsync_element.dstrect.y = option_vsync_element.dstrect.y * 0.95f;
+    option_vsync_element.dstrect.y = SDL_max((LEScreenHeight * 0.2) - (option_vsync_element.dstrect.h / 2), back_element.dstrect.y + back_element.dstrect.h);
+    checkbox_option_vsync_element.dstrect.x = option_vsync_element.dstrect.x + option_vsync_element.dstrect.w + 10;
+    checkbox_option_vsync_element.dstrect.y = option_vsync_element.dstrect.y - 6;
 
     struct MouseInfo mouse_info;
     mouse_info.state = SDL_GetMouseState(&mouse_info.x, &mouse_info.y);
@@ -115,7 +112,7 @@ bool OptionsRender(void) {
         fprintf(stderr, "Failed to render back button! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
-    if (!SDL_RenderTexture(renderer, *option_vsync_button.element->texture, NULL, &option_vsync_element.dstrect)) {
+    if (!SDL_RenderTexture(renderer, *option_vsync_element.texture, NULL, &option_vsync_element.dstrect)) {
         fprintf(stderr, "Failed to render options text! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
@@ -128,6 +125,8 @@ bool OptionsRender(void) {
 }
 
 void OptionsCleanup(void) {
+    LEInitWindow();
+
     SDL_DestroyTexture(back_texture);
     SDL_DestroyTexture(checkbox_option_vsync_texture);
     DestroyText(&option_vsync_label);

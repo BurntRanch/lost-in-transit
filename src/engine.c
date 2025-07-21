@@ -1,4 +1,5 @@
 #include "button.h"
+#include "options.h"
 #include "scenes/game/intro.h"
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_keycode.h>
@@ -61,6 +62,12 @@ static bool is_using_gpu = false;
 bool LEInitWindow(void) {
     if (window) {
         LEDestroyWindow();
+    }
+
+    if (options.vsync) {
+        SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+    } else {
+        SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
     }
 
     if (!(window = SDL_CreateWindow(TITLE, LEScreenWidth, LEScreenHeight, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE))) {

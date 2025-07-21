@@ -3,8 +3,10 @@
 
 #include <stdbool.h>
 
-static struct Options_t {
+extern struct Options_t {
     bool vsync;
 } options;
+
+void InitOptions();
 
 #endif // !_OPTIONS_H_
