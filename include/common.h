@@ -14,6 +14,14 @@ struct MouseInfo {
     SDL_MouseButtonFlags state;
 };
 
+struct LE_RenderElement {
+    /* Not used. It's the user's choice to use this variable to store a texture object (typically an SDL_Texture pointer) */
+    SDL_Texture **texture;
+
+    /* Where this element is to be rendered. */
+    struct SDL_FRect dstrect;
+};
+
 /* https://en.wikipedia.org/wiki/Smoothstep */
 static inline float smoothstep(float edge0, float edge1, float x) {
     // Scale, bias and saturate x to 0..1 range
