@@ -134,7 +134,7 @@ static inline bool InitTestPipeline() {
     color_target_description.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_DST_COLOR;
     color_target_description.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_DST_ALPHA;
     color_target_description.blend_state.enable_blend = false;
-    color_target_description.format = SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM;
+    color_target_description.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
 
     struct SDL_GPUVertexBufferDescription vertex_buffer_description;
     vertex_buffer_description.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;

@@ -125,9 +125,9 @@ bool OptionsRender(void) {
 }
 
 void OptionsCleanup(void) {
-    LEInitWindow();
-
     SDL_DestroyTexture(back_texture);
     SDL_DestroyTexture(checkbox_option_vsync_texture);
     DestroyText(&option_vsync_label);
+
+    LEInitWindow();
 }
