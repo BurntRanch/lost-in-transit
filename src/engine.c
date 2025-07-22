@@ -52,7 +52,6 @@ static SDL_Texture *render_texture = NULL;
 static SDL_GPUTransferBuffer *render_transferbuffer = NULL;
 
 static bool InitGPURenderTexture() {
-    /* Reset the GPU Texture */
     if (LESwapchainTexture) {
         SDL_ReleaseGPUTexture(gpu_device, LESwapchainTexture);
         LESwapchainTexture = NULL;
@@ -114,6 +113,10 @@ void LEDestroyWindow(void) {
 bool LEInitWindow(void) {
     if (window) {
         LEDestroyWindow();
+    }
+
+    if (LECommandBuffer) {
+        LECommandBuffer = NULL;
     }
 
     if (options.vsync) {
@@ -205,6 +208,10 @@ static inline bool StartGPURendering() {
 
 /* Downloads render result to render_texture */
 static inline bool FinishGPURendering() {
+    if (!LECommandBuffer) {
+        return false;
+    }
+
     SDL_GPUCopyPass *copy_pass;
 
     if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
@@ -250,7 +257,11 @@ static inline bool FinishGPURendering() {
 
     void *dst_pixels;
     int pitch;
-    SDL_LockTexture(render_texture, NULL, &dst_pixels, &pitch);
+    
+    if (!SDL_LockTexture(render_texture, NULL, &dst_pixels, &pitch)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to lock render_texture! If this happens too often, please report this issue!\n"); 
+        return true;
+    }
 
     SDL_memcpy(dst_pixels, pixels, pitch * LESwapchainHeight);
 
