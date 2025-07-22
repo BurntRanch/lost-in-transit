@@ -26,9 +26,9 @@ OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
 LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
-LDLIBS		+= -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lassimp -lstdc++
+LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lassimp -lcglm -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
-CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
+CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	 = $(CFLAGS)
 
 all: gamenetworkingsockets $(TARGET)

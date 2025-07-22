@@ -1,5 +1,4 @@
 #include "scenes/game/intro.h"
-#include "cglm/types.h"
 #include "engine.h"
 #include "networking.h"
 #include "scenes.h"
@@ -12,7 +11,11 @@
 #include <assimp/defs.h>
 #include <assimp/mesh.h>
 #include <assimp/vector3.h>
+#include <cglm/cam.h>
 #include <cglm/cglm.h>
+#include <cglm/affine.h>
+#include <cglm/quat.h>
+#include <stdalign.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <assimp/cimport.h>
@@ -55,6 +58,14 @@ static SDL_GPUGraphicsPipeline *test_pipeline = NULL;
 static struct Object **objects_array = NULL;
 static Uint32 objects_count = 0;
 
+static vec3 camera_pos = { 1, 0, 0 };
+
+alignas(16) static struct MatricesUBO {
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+} matrices;
+
 /* Don't laugh */
 static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t *pSizeOut) {
     void *data = NULL;
@@ -70,7 +81,8 @@ static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t 
 }
 
 static inline bool InitTestPipeline() {
-    SDL_GPUShaderCreateInfo vertex_shader_create_info, fragment_shader_create_info;
+    static SDL_GPUShaderCreateInfo vertex_shader_create_info, fragment_shader_create_info;
+
     vertex_shader_create_info.code = NULL;
     vertex_shader_create_info.code_size = sizeof(NULL);
     vertex_shader_create_info.entrypoint = "main";
@@ -78,7 +90,7 @@ static inline bool InitTestPipeline() {
     vertex_shader_create_info.num_samplers = 0;
     vertex_shader_create_info.num_storage_buffers = 0;
     vertex_shader_create_info.num_storage_textures = 0;
-    vertex_shader_create_info.num_uniform_buffers = 0;
+    vertex_shader_create_info.num_uniform_buffers = 1;
     vertex_shader_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     vertex_shader_create_info.props = 0;
 
@@ -416,6 +428,12 @@ static void GoToMainMenu(const ConnectionHandle _, [[gnu::unused]] const char *c
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     gpu_device = pGPUDevice;
 
+    glm_mat4_identity(matrices.view);
+    glm_mat4_identity(matrices.projection);
+
+    //glm_lookat(camera_pos, (vec3){0, 0, 0}, (vec3){0, 1, 0}, matrices.view);
+    glm_look(camera_pos, (vec3){1, 0, 0}, (vec3){0, 1, 0}, matrices.view);
+
     if (!InitTestPipeline()) {
         return false;
     }
@@ -430,6 +448,9 @@ bool IntroRender(void) {
     if (!objects_array && !LoadScene()) {
         return false;
     }
+
+    glm_perspective(1.5708f, (float)LESwapchainWidth/(float)LESwapchainHeight, 0.1f, 1000.f, matrices.projection);
+    // glm_perspective_default((float)LESwapchainWidth/(float)LESwapchainHeight, matrices.projection);
 
     static SDL_GPUColorTargetInfo color_target_info;
     color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};
@@ -465,6 +486,14 @@ bool IntroRender(void) {
 
             SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_buffer_binding, 1);
             SDL_BindGPUIndexBuffer(render_pass, &index_buffer_binding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+            glm_mat4_identity(matrices.model);
+
+            glm_translate(matrices.model, (vec3){ obj->position.x, obj->position.y, obj->position.z });
+            glm_quat_rotate(matrices.model, (vec4){ obj->rotation.x, obj->rotation.y, obj->rotation.z, obj->rotation.w }, matrices.model);
+            glm_scale(matrices.model, (vec3){ obj->scale.x, obj->scale.y, obj->scale.z });
+
+            SDL_PushGPUVertexUniformData(LECommandBuffer, 0, &matrices, sizeof(matrices));
 
             SDL_DrawGPUIndexedPrimitives(render_pass, obj->index_buffers[buf_idx].count, 1, 0, 0, 0);
         }

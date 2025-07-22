@@ -46,6 +46,61 @@ static SDL_Renderer *renderer = NULL;
 
 static SDL_GPUDevice *gpu_device = NULL;
 
+static SDL_Texture *render_texture = NULL;
+
+/* we keep this open because why should we keep opening/closing it each frame? */
+static SDL_GPUTransferBuffer *render_transferbuffer = NULL;
+
+static bool InitGPURenderTexture() {
+    /* Reset the GPU Texture */
+    if (LESwapchainTexture) {
+        SDL_ReleaseGPUTexture(gpu_device, LESwapchainTexture);
+        LESwapchainTexture = NULL;
+    }
+
+    if (render_transferbuffer) {
+        SDL_ReleaseGPUTransferBuffer(gpu_device, render_transferbuffer);
+        render_transferbuffer = NULL;
+    }
+
+    if (render_texture) {
+        SDL_DestroyTexture(render_texture);
+    }
+
+    static SDL_GPUTextureCreateInfo gpu_texture_create_info;
+    gpu_texture_create_info.type = SDL_GPU_TEXTURETYPE_2D;
+    gpu_texture_create_info.props = 0;
+    gpu_texture_create_info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+    gpu_texture_create_info.width = (LESwapchainWidth = LEScreenWidth);
+    gpu_texture_create_info.height = (LESwapchainHeight = LEScreenHeight);
+    gpu_texture_create_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    gpu_texture_create_info.num_levels = 1;
+    gpu_texture_create_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    gpu_texture_create_info.layer_count_or_depth = 1;
+
+    if (!(LESwapchainTexture = SDL_CreateGPUTexture(gpu_device, &gpu_texture_create_info))) {
+        fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
+    transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+    transfer_buffer_create_info.props = 0;
+    transfer_buffer_create_info.size = LESwapchainWidth * LESwapchainHeight * 4;  /* 4 bytes for each pixel */
+
+    if (!(render_transferbuffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info))) {
+        fprintf(stderr, "Failed to create GPU Transfer buffer! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    if (!(render_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, LESwapchainWidth, LESwapchainHeight))) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Failed to create render_texture! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    return true;
+}
+
 void LEDestroyWindow(void) {
     if (window) {
         SDL_DestroyWindow(window);
@@ -55,9 +110,6 @@ void LEDestroyWindow(void) {
         renderer = NULL;
     }
 }
-
-/* Are we using SDL_gpu now? Active on Scene3Ds */
-static bool is_using_gpu = false;
 
 bool LEInitWindow(void) {
     if (window) {
@@ -76,31 +128,22 @@ bool LEInitWindow(void) {
     }
     SDL_SetWindowMinimumSize(window, 400, 300);
 
-    if (!is_using_gpu) {
-        /* We have to call this stupid function, oh well */
-        if (!SDL_GetWindowSurface(window)) {
-            SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Something went wrong while getting a surface! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
-
-        if (!(renderer = SDL_GetRenderer(window))) {
-            SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting the renderer! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
-    } else {
-        if (!gpu_device && !(gpu_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, NULL))) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create GPU Device! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
-
-        if (!SDL_ClaimWindowForGPUDevice(gpu_device, window)) {
-            SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to claim window for GPU device! (SDL Error: %s)\n", SDL_GetError());
-            return false;
-        }
+    /* We have to call this stupid function, oh well */
+    if (!SDL_GetWindowSurface(window)) {
+        SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Something went wrong while getting a surface! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+    if (!(renderer = SDL_GetRenderer(window))) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting the renderer! (SDL Error: %s)\n", SDL_GetError());
+        return false;
     }
 
-    if (!SDL_GetWindowSize(window, &LEScreenWidth, &LEScreenHeight)) {
-        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting window size! (SDL Error: %s)\n", SDL_GetError());
+    if (!gpu_device && !(gpu_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, NULL))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create GPU Device! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    if (!InitGPURenderTexture()) {
         return false;
     }
 
@@ -157,54 +200,62 @@ static inline bool StartGPURendering() {
         return false;
     }
 
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(LECommandBuffer, window, &LESwapchainTexture, &LESwapchainWidth, &LESwapchainHeight)) {
-        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to acquire swapchain texture from command buffer! (SDL Error: %s)\n", SDL_GetError());
-        return false;
-    }
-
     return true;
 }
 
+/* Downloads render result to render_texture */
 static inline bool FinishGPURendering() {
-    if (!SDL_SubmitGPUCommandBuffer(LECommandBuffer)) {
+    SDL_GPUCopyPass *copy_pass;
+
+    if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
+        fprintf(stderr, "Failed to begin copy pass! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUTextureRegion src;
+    src.x = 0;
+    src.y = 0;
+    src.w = LESwapchainWidth;
+    src.h = LESwapchainHeight;
+    src.z = 0;
+    src.d = 1;
+    src.layer = 0;
+    src.texture = LESwapchainTexture;
+    src.mip_level = 0;
+
+    SDL_GPUTextureTransferInfo texture_transfer_info;
+    texture_transfer_info.offset = 0;
+    texture_transfer_info.pixels_per_row = LESwapchainWidth;
+    texture_transfer_info.rows_per_layer = LESwapchainHeight;
+    texture_transfer_info.transfer_buffer = render_transferbuffer;
+
+    SDL_DownloadFromGPUTexture(copy_pass, &src, &texture_transfer_info);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    SDL_GPUFence *fence;
+    if (!(fence = SDL_SubmitGPUCommandBufferAndAcquireFence(LECommandBuffer))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to submit command buffer to GPU device! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    return true;
-}
+    SDL_WaitForGPUFences(gpu_device, 1, &fence, 1);
+    SDL_ReleaseGPUFence(gpu_device, fence);
 
-/* Starts using the GPU Device. reinitializes the window. */
-static inline bool StartGPUDevice() {
-    if (is_using_gpu) {
-        return true;
-    }
-
-    is_using_gpu = true;
-
-    LEInitWindow();
-
-    /* We have to submit a command buffer (even if it's empty) to make the window visible. */
-    /* We do this so that the user doesn't get confused when the window just disappears and doesn't appear for a few seconds. */
-    if (!StartGPURendering() || !FinishGPURendering()) {
+    void *pixels;
+    if (!(pixels = SDL_MapGPUTransferBuffer(gpu_device, render_transferbuffer, false))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to map GPU Transfer buffer to memory! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    return true;
-}
+    void *dst_pixels;
+    int pitch;
+    SDL_LockTexture(render_texture, NULL, &dst_pixels, &pitch);
 
-/* Stops using the GPU Device. reinitializes the window. */
-static inline bool StopGPUDevice() {
-    if (!is_using_gpu) {
-        return true;
-    }
+    SDL_memcpy(dst_pixels, pixels, pitch * LESwapchainHeight);
 
-    is_using_gpu = false;
-
-    SDL_ReleaseWindowFromGPUDevice(gpu_device, window);
-    SDL_DestroyGPUDevice(gpu_device);
-
-    LEInitWindow();
+    SDL_UnmapGPUTransferBuffer(gpu_device, render_transferbuffer);
+    SDL_UnlockTexture(render_texture);
 
     return true;
 }
@@ -219,27 +270,27 @@ bool LELoadScene(const Uint8 scene) {
 
     switch (scene) {
         case SCENE_MAINMENU:
-            if (!StopGPUDevice() || !MainMenuInit(renderer)) {
+            if (!MainMenuInit(renderer)) {
                 return false;
             }
             break;
         case SCENE_OPTIONS:
-            if (!StopGPUDevice() || !OptionsInit(renderer)) {
+            if (!OptionsInit(renderer)) {
                 return false;
             }
             break;
         case SCENE_PLAY:
-            if (!StopGPUDevice() || !PlayInit(renderer)) {
+            if (!PlayInit(renderer)) {
                 return false;
             }
             break;
         case SCENE_LOBBY:
-            if (!StopGPUDevice() || !LobbyInit(renderer)) {
+            if (!LobbyInit(renderer)) {
                 return false;
             }
             break;
         case SCENE3D_INTRO:
-            if (!StartGPUDevice() || !IntroInit(gpu_device)) {
+            if (!IntroInit(gpu_device)) {
                 return false;
             }
             break;
@@ -308,6 +359,10 @@ bool LEStepRender(void) {
         } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
             LEScreenWidth = event.window.data1;
             LEScreenHeight = event.window.data2;
+
+            if (!InitGPURenderTexture()) {
+                return false;
+            }
         } else if (event.type == SDL_EVENT_KEY_DOWN) {
             switch (event.key.scancode) {
                 case SDL_SCANCODE_TAB:
@@ -328,14 +383,11 @@ bool LEStepRender(void) {
         return false;
     }
 
-    if (!is_using_gpu) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(renderer);
-    } else {
-        if (!StartGPURendering()) {
-            return false;
-        }
+    if (!StartGPURendering()) {
+        return false;
     }
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderClear(renderer);
 
     /* call the right render function for whatever scene we're running right now */
     switch (scene_loaded) {
@@ -367,13 +419,10 @@ bool LEStepRender(void) {
         default:;
     }
 
-    if (!is_using_gpu) {
-        SDL_RenderPresent(renderer);
-    } else {
-        if (!FinishGPURendering()) {
-            return false;
-        }
+    if (!FinishGPURendering()) {
+        return false;
     }
+    SDL_RenderPresent(renderer);
 
     LEFrametime = (now - last_frame_time) / 1000000000.0;
 
