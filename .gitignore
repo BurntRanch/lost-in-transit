@@ -14,6 +14,9 @@ cglm-0.9.6
 *.o
 *.obj
 
+# Compiled SPIR-V shaders
+*.spv
+
 # Precompiled Headers
 *.gch
 *.pch
