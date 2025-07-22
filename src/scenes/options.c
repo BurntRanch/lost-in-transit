@@ -129,5 +129,6 @@ void OptionsCleanup(void) {
     SDL_DestroyTexture(checkbox_option_vsync_texture);
     DestroyText(&option_vsync_label);
 
+    OverWriteConfigFile();
     LEInitWindow();
 }

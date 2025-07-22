@@ -8,5 +8,6 @@ extern struct Options_t {
 } options;
 
 void InitOptions();
+void OverWriteConfigFile();
 
 #endif // !_OPTIONS_H_
