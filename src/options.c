@@ -5,7 +5,7 @@
 
 struct Options_t options;
 
-const char *const PATH = "config.toml";
+const char *const PATH = "options.toml";
 
 static void error(const char *msg) {
   fprintf(stderr, "ERROR: %s\n", msg);
