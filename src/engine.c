@@ -259,7 +259,7 @@ static inline bool FinishGPURendering() {
     int pitch;
     
     if (!SDL_LockTexture(render_texture, NULL, &dst_pixels, &pitch)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to lock render_texture! If this happens too often, please report this issue!\n"); 
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to lock render_texture! If this happens too often, please report this issue! (SDL Error: %s)\n", SDL_GetError()); 
         return true;
     }
 
@@ -399,6 +399,10 @@ bool LEStepRender(void) {
     }
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
+
+    if (!SDL_RenderTexture(renderer, render_texture, NULL, NULL)) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Failed to render GPU target! (SDL Error: %s)\n", SDL_GetError());
+    }
 
     /* call the right render function for whatever scene we're running right now */
     switch (scene_loaded) {

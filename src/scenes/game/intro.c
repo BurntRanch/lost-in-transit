@@ -144,7 +144,7 @@ static inline bool InitTestPipeline() {
 
     struct SDL_GPUVertexAttribute vertex_attribute;
     vertex_attribute.buffer_slot = 0;
-    vertex_attribute.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    vertex_attribute.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attribute.location = 0;
     vertex_attribute.offset = 0;
 
@@ -432,7 +432,7 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     glm_mat4_identity(matrices.projection);
 
     //glm_lookat(camera_pos, (vec3){0, 0, 0}, (vec3){0, 1, 0}, matrices.view);
-    glm_look(camera_pos, (vec3){1, 0, 0}, (vec3){0, 1, 0}, matrices.view);
+    glm_look(camera_pos, (vec3){-1, 0, 0}, (vec3){0, 1, 0}, matrices.view);
 
     if (!InitTestPipeline()) {
         return false;
