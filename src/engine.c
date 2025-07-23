@@ -64,6 +64,7 @@ static bool InitGPURenderTexture() {
 
     if (render_texture) {
         SDL_DestroyTexture(render_texture);
+        render_texture = NULL;
     }
 
     static SDL_GPUTextureCreateInfo gpu_texture_create_info;
@@ -77,12 +78,13 @@ static bool InitGPURenderTexture() {
     gpu_texture_create_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
     gpu_texture_create_info.layer_count_or_depth = 1;
 
+    /* TODO: This keeps creating file descriptors, and doesn't close them. why? */
     if (!(LESwapchainTexture = SDL_CreateGPUTexture(gpu_device, &gpu_texture_create_info))) {
         fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
+    static SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
     transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
     transfer_buffer_create_info.props = 0;
     transfer_buffer_create_info.size = LESwapchainWidth * LESwapchainHeight * 4;  /* 4 bytes for each pixel */
@@ -212,14 +214,14 @@ static inline bool FinishGPURendering() {
         return false;
     }
 
-    SDL_GPUCopyPass *copy_pass;
+    static SDL_GPUCopyPass *copy_pass;
 
     if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
         fprintf(stderr, "Failed to begin copy pass! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    SDL_GPUTextureRegion src;
+    static SDL_GPUTextureRegion src;
     src.x = 0;
     src.y = 0;
     src.w = LESwapchainWidth;
@@ -230,7 +232,7 @@ static inline bool FinishGPURendering() {
     src.texture = LESwapchainTexture;
     src.mip_level = 0;
 
-    SDL_GPUTextureTransferInfo texture_transfer_info;
+    static SDL_GPUTextureTransferInfo texture_transfer_info;
     texture_transfer_info.offset = 0;
     texture_transfer_info.pixels_per_row = LESwapchainWidth;
     texture_transfer_info.rows_per_layer = LESwapchainHeight;
@@ -240,7 +242,7 @@ static inline bool FinishGPURendering() {
 
     SDL_EndGPUCopyPass(copy_pass);
 
-    SDL_GPUFence *fence;
+    static SDL_GPUFence *fence;
     if (!(fence = SDL_SubmitGPUCommandBufferAndAcquireFence(LECommandBuffer))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to submit command buffer to GPU device! (SDL Error: %s)\n", SDL_GetError());
         return false;
@@ -249,14 +251,14 @@ static inline bool FinishGPURendering() {
     SDL_WaitForGPUFences(gpu_device, 1, &fence, 1);
     SDL_ReleaseGPUFence(gpu_device, fence);
 
-    void *pixels;
+    static void *pixels;
     if (!(pixels = SDL_MapGPUTransferBuffer(gpu_device, render_transferbuffer, false))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to map GPU Transfer buffer to memory! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    void *dst_pixels;
-    int pitch;
+    static void *dst_pixels;
+    static int pitch;
     
     if (!SDL_LockTexture(render_texture, NULL, &dst_pixels, &pitch)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to lock render_texture! If this happens too often, please report this issue! (SDL Error: %s)\n", SDL_GetError()); 
@@ -321,6 +323,29 @@ void LEScheduleLoadScene(const Uint8 scene) {
 void LECleanupScene(void) {
     ClearButtonRegistry();
 
+    if (!StartGPURendering()) {
+        return;
+    }
+
+    /* clear the 3D scene */
+    static SDL_GPUColorTargetInfo color_target_info;
+    color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};
+    color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+    color_target_info.mip_level = 0;
+    color_target_info.store_op = SDL_GPU_STOREOP_STORE;
+    color_target_info.texture = LESwapchainTexture;
+
+    static SDL_GPURenderPass *render_pass;
+    if (!(render_pass = SDL_BeginGPURenderPass(LECommandBuffer, &color_target_info, 1, NULL))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin render pass! (SDL Error: %s)\n", SDL_GetError());
+        return;
+    }
+    SDL_EndGPURenderPass(render_pass);
+
+    if (!FinishGPURendering()) {
+        return;
+    }
+
     switch (scene_loaded) {
         case SCENE_MAINMENU:
             MainMenuCleanup();
@@ -363,6 +388,9 @@ bool LEStepRender(void) {
     }
 
     static SDL_Event event;
+
+    /* Is there a resize event here? if so, we'll apply the update only on the latest resize event */
+    static bool window_resized = false;
     while (SDL_PollEvent(&event)) {
         /* If escape is held down OR a window close is requested, return false. */
         if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) || event.type == SDL_EVENT_QUIT) {
@@ -371,9 +399,7 @@ bool LEStepRender(void) {
             LEScreenWidth = event.window.data1;
             LEScreenHeight = event.window.data2;
 
-            if (!InitGPURenderTexture()) {
-                return false;
-            }
+            window_resized = true;
         } else if (event.type == SDL_EVENT_KEY_DOWN) {
             switch (event.key.scancode) {
                 case SDL_SCANCODE_TAB:
@@ -388,6 +414,10 @@ bool LEStepRender(void) {
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
         }
+    }
+
+    if (window_resized && !InitGPURenderTexture()) {
+        return false;
     }
 
     if (!SRPollConnections()) {
