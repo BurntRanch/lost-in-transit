@@ -418,6 +418,20 @@ static inline bool LoadScene() {
         return false;
     }
 
+    /* TODO: load all player models */
+    const struct PlayersLinkedList *players = NETGetPlayers();
+
+    if (!players) {
+        /* Should be impossible.. */
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to get players! no players found! (\?\?\?)");
+        return false;
+    }
+
+    do {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "player: %d\n", players->ts.id);
+        players = players->next;
+    } while (players);
+
     return true;
 }
 

@@ -33,6 +33,17 @@ struct Player {
     int id;
 };
 
+struct PlayersLinkedList {
+    /* Next element. NULL if this is the last element. */
+    struct PlayersLinkedList *next;
+
+    /* LMAO i had to do this because `this` is reserved by CPP */
+    struct Player ts;
+
+    /* Previous element. NULL if this is the first element. */
+    struct PlayersLinkedList *prev;
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -64,6 +75,8 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
 
 /* Called by steam.cc */
 void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size);
+
+const struct PlayersLinkedList *NETGetPlayers();
 
 /* Called by steam.cc, only happens from the role of a client that failed to reach a server. in which case this would probably show an error to the user.
  *
