@@ -127,7 +127,7 @@ bool LEInitWindow(void) {
         SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
     }
 
-    if (!(window = SDL_CreateWindow(TITLE, LEScreenWidth, LEScreenHeight, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE))) {
+    if (!(window = SDL_CreateWindow(TITLE, LEScreenWidth, LEScreenHeight, SDL_WINDOW_VULKAN))) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Something went wrong while creating a window! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
