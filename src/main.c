@@ -29,7 +29,7 @@ int main() {
 
     // double frametime;
     while (LEStepRender()) {
-        printf("frametime: %fms (%ld FPS)\n", LEFrametime * 1000, SDL_lround(1 / LEFrametime));
+        // printf("frametime: %fms (%ld FPS)\n", LEFrametime * 1000, SDL_lround(1 / LEFrametime));
     }
 
     TTF_CloseFont(pLEGameFont);
