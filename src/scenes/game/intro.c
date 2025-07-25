@@ -419,6 +419,8 @@ static inline bool LoadScene() {
         return false;
     }
 
+    aiReleaseImport(scene);
+
     /* TODO: load all player models */
     const struct PlayersLinkedList *players = NETGetPlayers();
 
