@@ -1,7 +1,9 @@
 #include "options.h"
+#include <SDL3/SDL_iostream.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include "tomlc17.h"
+
+#include <SDL3/SDL_filesystem.h>
 
 struct Options_t options;
 
@@ -13,17 +15,18 @@ static void error(const char *msg) {
 }
 
 void OverWriteConfigFile() {
-    FILE *f = fopen(PATH, "w");
-    if (!f)
+    SDL_IOStream *stream = SDL_IOFromFile(PATH, "w");
+    if (!stream)
         return;
 
-    fprintf(f, "[config]\n");
-    fprintf(f, "vsync = %s\n", options.vsync ? "true" : "false");
-    fclose(f);
+    SDL_IOprintf(stream, "[config]\n");
+    SDL_IOprintf(stream, "vsync = %s\n", options.vsync ? "true" : "false");
+    
+    SDL_CloseIO(stream);
 }
 
 void InitOptions() {
-    if (access(PATH, F_OK) != 0) {
+    if (!SDL_GetPathInfo(PATH, NULL)) {
         OverWriteConfigFile();
     }
 
