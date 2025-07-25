@@ -383,7 +383,7 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
             Client_HandleDisconnectPacket(handle, disconnect_packet);
             break;
         case PACKET_TYPE_REQUEST_START:
-            /* There's no data, all we need to know is that this client requested to start the match. */
+            /* There's no data, all we need to know is that this client requested to start the game. */
             struct PlayersLinkedList *player = FindPlayerByHandle(players, handle);
             if (!player) {
                 fprintf(stderr, "Unknown player tried starting the game!\n");
@@ -448,6 +448,19 @@ void NETHandleData(const enum Role role, const ConnectionHandle handle, const vo
 
 const struct PlayersLinkedList *NETGetPlayers() {
     return players;
+}
+
+const struct Player *NETGetPlayerByID(int id) {
+    struct PlayersLinkedList *player_list = FindPlayerByID(players, id);
+    if (!player_list) {
+        return NULL;
+    }
+
+    return &player_list->ts;
+}
+
+int NETGetSelfID() {
+    return client_self.id;
 }
 
 void NETHandleConnectionFailure(const char *const pReason) {

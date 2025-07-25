@@ -1,8 +1,8 @@
 #include "options.h"
-#include <SDL3/SDL_iostream.h>
-#include <stdlib.h>
 #include "tomlc17.h"
 
+#include <stdlib.h>
+#include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_filesystem.h>
 
 struct Options_t options;

@@ -22,6 +22,9 @@ enum PacketType {
     PACKET_TYPE_DISCONNECT,
     PACKET_TYPE_REQUEST_START,
     PACKET_TYPE_TRANSITION,
+
+    /* scene-defined packet. */
+    PACKET_TYPE_SCENE,
 };
 
 enum TransDestination {
@@ -59,8 +62,13 @@ extern "C" {
  */
 void NETSetServerDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char *const));
 void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char *const));
+
 void NETSetClientJoinCallback(void (*pCallback)(const ConnectionHandle, const struct Player *const));
 void NETSetClientLeaveCallback(void (*pCallback)(const ConnectionHandle, int));
+
+void NETSetServerDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t));
+void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t));
+
 void NETSetServerConnectCallback(void (*pCallback)(const ConnectionHandle));
 void NETSetClientConnectCallback(void (*pCallback)(const ConnectionHandle));
 
@@ -77,6 +85,11 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
 void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size);
 
 const struct PlayersLinkedList *NETGetPlayers();
+
+const struct Player *NETGetPlayerByID(int id);
+
+/* For the client: Returns this client's ID to the server. */
+int NETGetSelfID();
 
 /* Called by steam.cc, only happens from the role of a client that failed to reach a server. in which case this would probably show an error to the user.
  *

@@ -15,6 +15,7 @@
 #include <cglm/cglm.h>
 #include <cglm/affine.h>
 #include <cglm/quat.h>
+#include <cglm/types.h>
 #include <stdalign.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -50,6 +51,25 @@ struct Object {
     size_t buffers_count;
 };
 
+/* sent through the network when a players state updates */
+struct PlayerUpdate {
+    enum PacketType type;
+    int id;
+
+    vec3 position;
+    vec4 rotation;
+    vec3 scale;
+};
+
+struct PlayerObjectList {
+    struct PlayerObjectList *prev;
+
+    struct Object *obj;
+    int id;
+
+    struct PlayerObjectList *next;
+};
+
 static SDL_GPUDevice *gpu_device = NULL;
 
 static struct Shader test_shader;
@@ -57,6 +77,8 @@ static SDL_GPUGraphicsPipeline *test_pipeline = NULL;
 
 static struct Object **objects_array = NULL;
 static Uint32 objects_count = 0;
+
+static struct PlayerObjectList *player_objects;
 
 static vec3 camera_pos = { 1, 0, 0 };
 
@@ -392,7 +414,7 @@ static inline struct Object *EmplaceObject() {
     return (objects_array[objects_count - 1] = SDL_malloc(sizeof(struct Object)));
 }
 
-/* Recursively load all the objects in the scene */
+/* Recursively load all the objects in the scene starting from node (and its children) */
 static inline bool LoadSceneObjects(const struct aiScene *scene, const struct aiNode *node) {
     if (node->mNumMeshes > 0 && !LoadObject(scene, node, EmplaceObject())) {
         return false;
@@ -404,6 +426,39 @@ static inline bool LoadSceneObjects(const struct aiScene *scene, const struct ai
     }
 
     return true;
+}
+
+/* Search a node (and its children, recursively) for a node with the name `name`. returns NULL on fail. */
+static inline const struct aiNode *GetNodeByName(const struct aiNode *pNode, const char *name, size_t len) {
+    if (SDL_strncmp(pNode->mName.data, name, SDL_min(pNode->mName.length, len)) == 0) {
+        return pNode;
+    }
+
+    static struct aiNode *child;
+    for (size_t i = 0; i < pNode->mNumChildren; i++) {
+        child = pNode->mChildren[i];
+
+        if (GetNodeByName(child, name, len)) {
+            return child;
+        }
+    }
+
+    return NULL;
+}
+
+static inline void AppendPlayerObject(struct PlayerObjectList *pPlayerObject) {
+    if (!player_objects) {
+        player_objects = pPlayerObject;
+        return;
+    }
+
+    struct PlayerObjectList *head = player_objects;
+    while (head->next) {
+        head = head->next;
+    }
+
+    head->next = pPlayerObject;
+    pPlayerObject->prev = head;
 }
 
 /* Loads all the models and stuff necessary for the game! */
@@ -421,7 +476,21 @@ static inline bool LoadScene() {
 
     aiReleaseImport(scene);
 
-    /* TODO: load all player models */
+    const struct aiScene *character_scene = aiImportFile("models/character.glb", 0);
+
+    if (!character_scene) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to import 'models/character.glb'!\n");
+        return false;
+    }
+
+    /* The actual 'Character' node that we're looking for in the scene. */
+    const struct aiNode *character_node = GetNodeByName(character_scene->mRootNode, "Character", 10);
+
+    if (!character_node) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to find 'Character' node in character scene!\n");
+        return false;
+    }
+
     const struct PlayersLinkedList *players = NETGetPlayers();
 
     if (!players) {
@@ -432,6 +501,19 @@ static inline bool LoadScene() {
 
     do {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "player: %d\n", players->ts.id);
+
+        struct PlayerObjectList *player_obj = SDL_malloc(sizeof(struct PlayerObjectList));
+
+        player_obj->obj = EmplaceObject();
+        player_obj->id = players->ts.id;
+
+        if (!LoadObject(character_scene, character_node, player_obj->obj)) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load character node!\n");
+            return false;
+        }
+
+        AppendPlayerObject(player_obj);
+
         players = players->next;
     } while (players);
 
@@ -440,6 +522,56 @@ static inline bool LoadScene() {
 
 static void GoToMainMenu(const ConnectionHandle _, [[gnu::unused]] const char *const _pReason) {
     LEScheduleLoadScene(SCENE_MAINMENU);
+}
+
+static inline struct PlayerObjectList *GetPlayerObjectByID(int id) {
+    if (!player_objects) {
+        return NULL;
+    }
+
+    struct PlayerObjectList *i = player_objects;
+    while (i && i->id != id) {
+        i = i->next;
+    }
+
+    return i;
+}
+
+static void OnNetData(const ConnectionHandle _, const void * const data, const size_t size) {
+    if (size < sizeof(struct PlayerUpdate)) {
+        /* Maybe it isn't a PlayerUpdate.. */
+        return;
+    }
+
+    const struct PlayerUpdate * player_update = data;
+    const struct PlayerObjectList * player_obj = GetPlayerObjectByID(player_update->id);
+
+    if (!player_obj) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Got a PlayerUpdate, but we couldn't find the player object!\n");
+        return;
+    }
+
+    player_obj->obj->position.x = player_update->position[0];
+    player_obj->obj->position.y = player_update->position[1];
+    player_obj->obj->position.z = player_update->position[2];
+
+    player_obj->obj->rotation.x = player_update->rotation[0];
+    player_obj->obj->rotation.y = player_update->rotation[1];
+    player_obj->obj->rotation.z = player_update->rotation[2];
+    player_obj->obj->rotation.z = player_update->rotation[3];
+    
+    player_obj->obj->scale.x = player_update->scale[0];
+    player_obj->obj->scale.y = player_update->scale[1];
+    player_obj->obj->scale.z = player_update->scale[2];
+
+    if (player_obj->id == NETGetSelfID()) {
+        SDL_memcpy(&camera_pos, player_update->position, sizeof(camera_pos));
+    }
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "player %d update:\n", player_obj->id);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew position: %f %f %f\n", player_update->position[0], player_update->position[1], player_update->position[2]);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew rotation: %f %f %f %f\n", player_update->rotation[0], player_update->rotation[1], player_update->rotation[2], player_update->rotation[3]);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew scale: %f %f %f\n", player_update->scale[0], player_update->scale[1], player_update->scale[2]);
 }
 
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
@@ -456,6 +588,7 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     }
 
     NETSetClientDisconnectCallback(GoToMainMenu);
+    NETSetClientDataCallback(OnNetData);
 
     return true;
 }
