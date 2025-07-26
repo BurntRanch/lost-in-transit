@@ -161,6 +161,7 @@ bool SRSendMessageToClients(void *data, const int size) {
 }
 
 void SRDisconnectClient(const ConnectionHandle handle, const char * pReason) {
+    NETCleanupClient();
     SteamNetworkingSockets()->CloseConnection(handle, 0, pReason, true);
 }
 
@@ -169,7 +170,7 @@ bool SRIsHostingServer(void) {
 }
 
 void SRStopServer(void) {
-    NETCleanup();
+    NETCleanupServer();
 
     for (const HSteamNetConnection &conn : server_clients) {
         SteamNetworkingSockets()->CloseConnection(conn, 0, "Server shutting down", true);

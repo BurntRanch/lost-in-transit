@@ -15,6 +15,10 @@
  */
 #define ADMIN_ID 4500
 
+#define DEFAULT_POS {0.f, 0.f, 0.f}
+#define DEFAULT_ROT {0.f, 0.f, 0.f, 1.f}
+#define DEFAULT_SCALE {1.f, 1.f, 1.f}
+
 /* Sent by a client, echo'd out by the server. */
 struct HelloPacket {
     enum PacketType type;
@@ -25,6 +29,11 @@ struct HelloPacket {
     ConnectionHandle server_handle;
 
     int id;
+
+    /* Ignored by the server, but picked up by the client. */
+    vec3 position;
+    vec4 rotation;
+    vec3 scale;
 };
 
 /* Sent by the server. */
@@ -57,12 +66,13 @@ static void (*client_join_callback)(const ConnectionHandle, const struct Player 
 static void (*client_leave_callback)(const ConnectionHandle, int) = NULL;
 static void (*client_connect_callback)(const ConnectionHandle) = NULL;
 
-/* who are we to the server? */
-static struct Player client_self;
 /* Our connection to the server. */
 static ConnectionHandle client_connection;
 
 static struct PlayersLinkedList *players = NULL;
+
+/* who are we to the server? (in the players list) */
+static struct Player *client_self;
 
 /* Creates a linked list object. You can append this to another linked list and so on. */
 static inline struct PlayersLinkedList *AllocPlayersLinkedList(const struct Player *const data) {
@@ -229,11 +239,11 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle) {
         case NET_ROLE_CLIENT:
             printf("Connected to server (%d)!\n", handle);
 
-            client_self.handle = 0;
             client_connection = handle;
 
-            /* watch how the server overrides our constant 4500 ID. */
-            struct HelloPacket packet = {PACKET_TYPE_HELLO, handle, 4500};
+            /* watch how the server overrides our constant 4500 ID.
+             * the model values (pos/rot/sca) are ignored by the server */
+            struct HelloPacket packet = {PACKET_TYPE_HELLO, handle, 4500, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
 
             if (!SRSendToConnection(handle, &packet, sizeof(packet))) {
                 /* :( */
@@ -264,7 +274,15 @@ static inline struct PlayersLinkedList *AddPlayer(const ConnectionHandle handle,
         }
     }
 
-    struct Player player = {handle, id};
+    struct Player player = {handle, id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
+
+    /* TODO: this is just a test, don't forget to remove lol */
+    if (id == ADMIN_ID) {
+        player.position[0] -= 25;
+    } else {
+        player.position[0] += 25;
+    }
+
     struct PlayersLinkedList *player_list = AllocPlayersLinkedList(&player);
 
     ConnectLinkedLists(player_list, players);
@@ -287,11 +305,16 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
         last_list = last_list->next;
     }
 
-    struct HelloPacket packet = {PACKET_TYPE_HELLO, hello_packet->server_handle, player_list->ts.id};
+    struct HelloPacket packet = {PACKET_TYPE_HELLO, hello_packet->server_handle, player_list->ts.id,
+                                    {*player_list->ts.position}, {*player_list->ts.rotation}, {*player_list->ts.scale}};
     /* send the player hello packets for every existing player so they catch up */
     while (last_list) {
         packet.server_handle = last_list->ts.handle;
         packet.id = last_list->ts.id;
+
+        SDL_memcpy(packet.position, last_list->ts.position, sizeof(packet.position));
+        SDL_memcpy(packet.rotation, last_list->ts.rotation, sizeof(packet.rotation));
+        SDL_memcpy(packet.scale, last_list->ts.scale, sizeof(packet.scale));
 
         /* we want to send this one to **everybody** */
         if (last_list == player_list) {
@@ -315,16 +338,11 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
 }
 
 static inline void Client_HandleHelloPacket(const ConnectionHandle handle, const struct HelloPacket *const hello_packet) {
-    if (hello_packet->server_handle == handle) {
-        client_self.handle = handle;
-        client_self.id = hello_packet->id;
+    struct Player player = {hello_packet->server_handle, hello_packet->id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
 
-        SDL_Log("Server signed us in with ID %d!\n", hello_packet->id);
-    } else {
-        SDL_Log("Server signed someone else in with ID %d.\n", hello_packet->id);
-    }
-
-    const struct Player player = {hello_packet->server_handle, hello_packet->id};
+    SDL_memcpy(player.position, hello_packet->position, sizeof(player.position));
+    SDL_memcpy(player.rotation, hello_packet->rotation, sizeof(player.rotation));
+    SDL_memcpy(player.scale, hello_packet->scale, sizeof(player.scale));
 
     /* If we are hosting an internal server, `players` is managed by the server, not the client part. */
     if (!SRIsHostingServer()) {
@@ -332,6 +350,17 @@ static inline void Client_HandleHelloPacket(const ConnectionHandle handle, const
         ConnectLinkedLists(player_list, players);
         players = player_list;
     }
+    
+    if (hello_packet->server_handle == handle) {
+        /* FindPlayerByID is guaranteed to succeed.
+         * (in the extremely unlikely off-chance that it doesn't, a NULL pointer dereference is better than whatever mess is going on in the clients PC.) */
+        client_self = &FindPlayerByID(players, hello_packet->id)->ts;
+
+        SDL_Log("Server signed us in with ID %d!\n", hello_packet->id);
+    } else {
+        SDL_Log("Server signed someone else in with ID %d.\n", hello_packet->id);
+    }
+
 
     if (client_join_callback) {
         client_join_callback(handle, &player);
@@ -460,7 +489,7 @@ const struct Player *NETGetPlayerByID(int id) {
 }
 
 int NETGetSelfID() {
-    return client_self.id;
+    return client_self ? client_self->id : -1;
 }
 
 void NETHandleConnectionFailure(const char *const pReason) {
@@ -472,7 +501,7 @@ void NETHandleConnectionFailure(const char *const pReason) {
 }
 
 bool NETIsAdministrator() {
-    return client_self.id == ADMIN_ID;
+    return client_self && client_self->id == ADMIN_ID;
 }
 
 void NETRequestStart() {
@@ -481,7 +510,19 @@ void NETRequestStart() {
     SRSendToConnection(client_connection, &packet, sizeof(packet));
 }
 
-void NETCleanup() {
-    FreeLists(players);
-    players = NULL;
+void NETCleanupServer() {
+    /* if we're not running a client then this list is going to be unused. */
+    if (!SRIsConnectedToServer()) {
+        FreeLists(players);
+        players = NULL;
+    }
+}
+
+void NETCleanupClient() {
+    /* if we're not running a server then this list is going to be unused. */
+    if (!SRIsHostingServer()) {
+        FreeLists(players);
+        players = NULL;
+    }
+    client_self = NULL;
 }

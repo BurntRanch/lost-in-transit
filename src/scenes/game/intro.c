@@ -80,7 +80,7 @@ static Uint32 objects_count = 0;
 
 static struct PlayerObjectList *player_objects;
 
-static vec3 camera_pos = { 1, 0, 0 };
+static vec3 camera_pos = { 0, 0, 0 };
 
 alignas(16) static struct MatricesUBO {
     mat4 model;
@@ -500,17 +500,38 @@ static inline bool LoadScene() {
     }
 
     do {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "player: %d\n", players->ts.id);
+        if (players->ts.id == NETGetSelfID()) {
+            SDL_memcpy(camera_pos, players->ts.position, sizeof(camera_pos));
+            players = players->next;
+            continue;
+        }
 
         struct PlayerObjectList *player_obj = SDL_malloc(sizeof(struct PlayerObjectList));
 
+        player_obj->prev = NULL;
+
         player_obj->obj = EmplaceObject();
         player_obj->id = players->ts.id;
+
+        player_obj->next = NULL;
 
         if (!LoadObject(character_scene, character_node, player_obj->obj)) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load character node!\n");
             return false;
         }
+
+        player_obj->obj->position.x = players->ts.position[0];
+        player_obj->obj->position.y = players->ts.position[1];
+        player_obj->obj->position.z = players->ts.position[2];
+
+        player_obj->obj->rotation.x = players->ts.rotation[0];
+        player_obj->obj->rotation.y = players->ts.rotation[1];
+        player_obj->obj->rotation.z = players->ts.rotation[2];
+        player_obj->obj->rotation.w = players->ts.rotation[3];
+        
+        player_obj->obj->scale.x = players->ts.scale[0];
+        player_obj->obj->scale.y = players->ts.scale[1];
+        player_obj->obj->scale.z = players->ts.scale[2];
 
         AppendPlayerObject(player_obj);
 
@@ -544,6 +565,12 @@ static void OnNetData(const ConnectionHandle _, const void * const data, const s
     }
 
     const struct PlayerUpdate * player_update = data;
+    
+    if (player_update->id == NETGetSelfID()) {
+        SDL_memcpy(camera_pos, player_update->position, sizeof(camera_pos));
+        return;
+    }
+    
     const struct PlayerObjectList * player_obj = GetPlayerObjectByID(player_update->id);
 
     if (!player_obj) {
@@ -564,10 +591,6 @@ static void OnNetData(const ConnectionHandle _, const void * const data, const s
     player_obj->obj->scale.y = player_update->scale[1];
     player_obj->obj->scale.z = player_update->scale[2];
 
-    if (player_obj->id == NETGetSelfID()) {
-        SDL_memcpy(&camera_pos, player_update->position, sizeof(camera_pos));
-    }
-    
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "player %d update:\n", player_obj->id);
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew position: %f %f %f\n", player_update->position[0], player_update->position[1], player_update->position[2]);
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew rotation: %f %f %f %f\n", player_update->rotation[0], player_update->rotation[1], player_update->rotation[2], player_update->rotation[3]);
@@ -581,7 +604,6 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     glm_mat4_identity(matrices.projection);
 
     //glm_lookat(camera_pos, (vec3){0, 0, 0}, (vec3){0, 1, 0}, matrices.view);
-    glm_look(camera_pos, (vec3){-1, 0, 0}, (vec3){0, 1, 0}, matrices.view);
 
     if (!InitTestPipeline()) {
         return false;
@@ -600,7 +622,7 @@ bool IntroRender(void) {
     }
 
     glm_perspective(1.5708f, (float)LESwapchainWidth/(float)LESwapchainHeight, 0.1f, 1000.f, matrices.projection);
-    // glm_perspective_default((float)LESwapchainWidth/(float)LESwapchainHeight, matrices.projection);
+    glm_look(camera_pos, (vec3){-1, 0, 0}, (vec3){0, 1, 0}, matrices.view);
 
     static SDL_GPUColorTargetInfo color_target_info;
     color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};

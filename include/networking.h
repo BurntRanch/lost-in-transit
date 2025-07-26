@@ -3,6 +3,8 @@
 
 #include <SDL3/SDL_stdinc.h>
 
+#include <cglm/types.h>
+
 /* Think of this file as a list of high-level handlers, with steam.cc being a low-level handler of Steam connections. */
 /* We'll define callbacks, track connections, and handle game events here. And if needed, we'll send over some commands to the engine (like change scenes). */
 
@@ -34,6 +36,10 @@ enum TransDestination {
 struct Player {
     ConnectionHandle handle;
     int id;
+
+    vec3 position;
+    vec4 rotation;
+    vec3 scale;
 };
 
 struct PlayersLinkedList {
@@ -104,8 +110,11 @@ bool NETIsAdministrator();
 /* Ask the server to start the game. Only works if you're the administrator (Check with NETIsAdministrator). No guarantee of success. */
 void NETRequestStart();
 
-/* Clean up anything allocated in the heap. */
-void NETCleanup();
+/* reset server state */
+void NETCleanupServer();
+
+/* reset client state */
+void NETCleanupClient();
 
 #ifdef __cplusplus
 }
