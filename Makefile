@@ -31,7 +31,12 @@ CFLAGS  	?= -mtune=generic -march=native
 CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	 = $(CFLAGS)
 
-all: gamenetworkingsockets $(TARGET)
+SHADER_DIR 	 = shaders
+SHADERS 	 = $(wildcard $(SHADER_DIR)/*.vert $(SHADER_DIR)/*.frag)
+SPV 		 = $(SHADERS:.vert=.vert.spv)
+SPV 		:= $(SPV:.frag=.frag.spv)
+
+all: gamenetworkingsockets shaders $(TARGET)
 
 gamenetworkingsockets:
 ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.so),)
@@ -44,11 +49,18 @@ ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.so),)
 	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.so $(BUILDDIR)
 endif
 
-$(TARGET): gamenetworkingsockets $(OBJ)
+$(TARGET): shaders gamenetworkingsockets $(OBJ)
 	mkdir -p $(BUILDDIR)
 	$(CC) $(OBJ) -o $(BUILDDIR)/$(TARGET) $(LDFLAGS) $(LDLIBS)
 
 clean:
 	rm -rf $(BUILDDIR)/$(TARGET) $(OBJ)
+
+shaders: $(SPV)
+%.vert.spv: %.vert
+	glslangValidator -V $< -o $@
+
+%.frag.spv: %.frag
+	glslangValidator -V $< -o $@
 
 .PHONY: $(TARGET) clean gamenetworkingsockets all
