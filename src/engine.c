@@ -1,4 +1,5 @@
 #include "button.h"
+#include "networking.h"
 #include "options.h"
 #include "scenes/game/intro.h"
 #include <SDL3/SDL_gpu.h>
@@ -370,6 +371,7 @@ static Uint64 last_frame_time;
 static Uint64 now;
 
 double LEFrametime = 0.0;
+static double time_since_network_tick = 0.0;
 
 SDL_GPUCommandBuffer *LECommandBuffer = NULL;
 SDL_GPUTexture *LESwapchainTexture = NULL;
@@ -424,6 +426,12 @@ bool LEStepRender(void) {
         return false;
     }
 
+    while (time_since_network_tick >= 1.0/NETWORKING_TICKRATE) {
+        NETTickServer();
+
+        time_since_network_tick -= 1.0/NETWORKING_TICKRATE;
+    }
+
     if (!StartGPURendering()) {
         return false;
     }
@@ -470,6 +478,7 @@ bool LEStepRender(void) {
     SDL_RenderPresent(renderer);
 
     LEFrametime = (now - last_frame_time) / 1000000000.0;
+    time_since_network_tick += LEFrametime;
 
     last_frame_time = now;
 

@@ -1,8 +1,10 @@
 #ifndef NETWORKING_H
 #define NETWORKING_H
 
-#include <SDL3/SDL_stdinc.h>
+/* used by engine.c */
+#define NETWORKING_TICKRATE 60
 
+#include <SDL3/SDL_stdinc.h>
 #include <cglm/types.h>
 
 /* Think of this file as a list of high-level handlers, with steam.cc being a low-level handler of Steam connections. */
@@ -24,12 +26,11 @@ enum PacketType {
     PACKET_TYPE_DISCONNECT,
     PACKET_TYPE_REQUEST_START,
     PACKET_TYPE_TRANSITION,
-
-    /* scene-defined packet. */
-    PACKET_TYPE_SCENE,
+    PACKET_TYPE_PLAYER_UPDATE,
 };
 
 enum TransDestination {
+    TRANS_DEST_NONE,
     TRANS_DEST_INTRO,
 };
 
@@ -72,8 +73,7 @@ void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, co
 void NETSetClientJoinCallback(void (*pCallback)(const ConnectionHandle, const struct Player *const));
 void NETSetClientLeaveCallback(void (*pCallback)(const ConnectionHandle, int));
 
-void NETSetServerDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t));
-void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t));
+void NETSetClientUpdateCallback(void (*pCallback)(ConnectionHandle, const struct Player * const));
 
 void NETSetServerConnectCallback(void (*pCallback)(const ConnectionHandle));
 void NETSetClientConnectCallback(void (*pCallback)(const ConnectionHandle));
@@ -89,6 +89,8 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
 
 /* Called by steam.cc */
 void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size);
+
+void NETTickServer();
 
 const struct PlayersLinkedList *NETGetPlayers();
 

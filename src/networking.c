@@ -56,12 +56,21 @@ struct TransitionPacket {
     enum TransDestination dest;
 };
 
+/* sent by the server when a players state updates */
+struct PlayerUpdate {
+    enum PacketType type;
+    int id;
+
+    vec3 position;
+    vec4 rotation;
+    vec3 scale;
+};
+
 static void (*server_disconnect_callback)(const ConnectionHandle, const char *const) = NULL;
-static void (*server_data_callback)(const ConnectionHandle, const void *const, const size_t) = NULL;
 static void (*server_connect_callback)(const ConnectionHandle) = NULL;
 
 static void (*client_disconnect_callback)(const ConnectionHandle, const char *const) = NULL;
-static void (*client_data_callback)(const ConnectionHandle, const void *const, const size_t) = NULL;
+static void (*client_update_callback)(ConnectionHandle, const struct Player *const) = NULL;
 static void (*client_join_callback)(const ConnectionHandle, const struct Player *const) = NULL;
 static void (*client_leave_callback)(const ConnectionHandle, int) = NULL;
 static void (*client_connect_callback)(const ConnectionHandle) = NULL;
@@ -73,6 +82,8 @@ static struct PlayersLinkedList *players = NULL;
 
 /* who are we to the server? (in the players list) */
 static struct Player *client_self;
+
+static enum TransDestination server_current_stage = TRANS_DEST_NONE;
 
 /* Creates a linked list object. You can append this to another linked list and so on. */
 static inline struct PlayersLinkedList *AllocPlayersLinkedList(const struct Player *const data) {
@@ -173,10 +184,6 @@ void NETSetServerDisconnectCallback(void (*pCallback)(const ConnectionHandle, co
 void NETSetServerConnectCallback(void (*pCallback)(const ConnectionHandle)) {
     server_connect_callback = pCallback;
 }
-void NETSetServerDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t)) {
-    server_data_callback = pCallback;
-}
-
 void NETSetClientDisconnectCallback(void (*pCallback)(const ConnectionHandle, const char *const)) {
     client_disconnect_callback = pCallback;
 }
@@ -189,8 +196,8 @@ void NETSetClientJoinCallback(void (*pCallback)(const ConnectionHandle, const st
 void NETSetClientLeaveCallback(void (*pCallback)(const ConnectionHandle, int)) {
     client_leave_callback = pCallback;
 }
-void NETSetClientDataCallback(void (*pCallback)(const ConnectionHandle, const void *const, const size_t)) {
-    client_data_callback = pCallback;
+void NETSetClientUpdateCallback(void (*pCallback)(ConnectionHandle, const struct Player *const)) {
+    client_update_callback = pCallback;
 }
 
 void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, const char *const pMessage) {
@@ -279,8 +286,6 @@ static inline struct PlayersLinkedList *AddPlayer(const ConnectionHandle handle,
     /* TODO: this is just a test, don't forget to remove lol */
     if (id == ADMIN_ID) {
         player.position[0] -= 25;
-    } else {
-        player.position[0] += 25;
     }
 
     struct PlayersLinkedList *player_list = AllocPlayersLinkedList(&player);
@@ -424,7 +429,8 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
             }
 
             /* The administrator has requested to start the game. */
-            struct TransitionPacket packet = {PACKET_TYPE_TRANSITION, TRANS_DEST_INTRO};
+            server_current_stage = TRANS_DEST_INTRO;
+            struct TransitionPacket packet = {PACKET_TYPE_TRANSITION, server_current_stage};
             if (!SRSendMessageToClients(&packet, sizeof(packet))) {
                 fprintf(stderr, "Failed to send TransitionPacket to clients!\n");
                 return;
@@ -448,6 +454,29 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
             }
 
             break;
+        case PACKET_TYPE_PLAYER_UPDATE:
+            if (size < sizeof(struct PlayerUpdate)) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Received malformed packet! (size < sizeof(struct PlayerUpdatePacket))\n");
+                return;
+            }
+
+            const struct PlayerUpdate *player_update_packet = data;
+            struct PlayersLinkedList *target_player = FindPlayerByID(players, player_update_packet->id);
+
+            if (!target_player) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Can't find target of player update!\n");
+                return;
+            }
+
+            SDL_memcpy(target_player->ts.position, player_update_packet->position, sizeof(target_player->ts.position));
+            SDL_memcpy(target_player->ts.rotation, player_update_packet->rotation, sizeof(target_player->ts.rotation));
+            SDL_memcpy(target_player->ts.scale, player_update_packet->scale, sizeof(target_player->ts.scale));
+
+            if (client_update_callback) {
+                client_update_callback(handle, &target_player->ts);
+            }
+
+            break;
         default:
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[ROLE %d]: Received malformed packet! (invalid type)\n", role);
             ;
@@ -456,22 +485,48 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
 
 void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size) {
     HandlePacket(role, handle, data, size);
+}
 
-    switch (role) {
-        case NET_ROLE_SERVER:
-            printf("Received data from client %d!\n", handle);
+/* send an update to all clients */
+static void UpdatePlayer(const struct Player *const player) {
+    struct PlayerUpdate packet = {PACKET_TYPE_PLAYER_UPDATE, player->id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
 
-            if (server_data_callback) {
-                server_data_callback(handle, data, size);
-            }
+    SDL_memcpy(packet.position, player->position, sizeof(packet.position));
+    SDL_memcpy(packet.rotation, player->rotation, sizeof(packet.rotation));
+    SDL_memcpy(packet.scale, player->scale, sizeof(packet.scale));
+
+    if (!SRSendMessageToClients(&packet, sizeof(packet))) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to send Player Update packet to clients!\n");
+        return;
+    }
+}
+
+static bool pong_direction_forward = false;
+static inline void TickIntroStage() {
+    struct PlayersLinkedList *admin_player_list = FindPlayerByID(players, 4500);
+
+    /* admin probably didn't join yet, otherwise this should never happen */
+    if (!admin_player_list) {
+        return;
+    }
+
+    if (25 <= admin_player_list->ts.position[0] || admin_player_list->ts.position[0] <= -25) {
+        admin_player_list->ts.position[0] = (pong_direction_forward ? -25 : 25);
+        pong_direction_forward = !pong_direction_forward;
+    }
+
+    admin_player_list->ts.position[0] += (1.0/NETWORKING_TICKRATE) * (pong_direction_forward ? -10 : 10);
+
+    UpdatePlayer(&admin_player_list->ts);
+}
+
+void NETTickServer() {
+    switch (server_current_stage) {
+        case TRANS_DEST_INTRO:
+            TickIntroStage();
             break;
-        case NET_ROLE_CLIENT:
-            printf("Received data from the server!\n");
-
-            if (client_data_callback) {
-                client_data_callback(handle, data, size);
-            }
-            break;
+        default:
+            ;
     }
 }
 

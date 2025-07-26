@@ -51,16 +51,6 @@ struct Object {
     size_t buffers_count;
 };
 
-/* sent through the network when a players state updates */
-struct PlayerUpdate {
-    enum PacketType type;
-    int id;
-
-    vec3 position;
-    vec4 rotation;
-    vec3 scale;
-};
-
 struct PlayerObjectList {
     struct PlayerObjectList *prev;
 
@@ -558,43 +548,36 @@ static inline struct PlayerObjectList *GetPlayerObjectByID(int id) {
     return i;
 }
 
-static void OnNetData(const ConnectionHandle _, const void * const data, const size_t size) {
-    if (size < sizeof(struct PlayerUpdate)) {
-        /* Maybe it isn't a PlayerUpdate.. */
-        return;
-    }
-
-    const struct PlayerUpdate * player_update = data;
-    
-    if (player_update->id == NETGetSelfID()) {
-        SDL_memcpy(camera_pos, player_update->position, sizeof(camera_pos));
+static void OnPlayerUpdate(const ConnectionHandle _, const struct Player * const player) {
+    if (player->id == NETGetSelfID()) {
+        SDL_memcpy(camera_pos, player->position, sizeof(camera_pos));
         return;
     }
     
-    const struct PlayerObjectList * player_obj = GetPlayerObjectByID(player_update->id);
+    const struct PlayerObjectList * player_obj = GetPlayerObjectByID(player->id);
 
     if (!player_obj) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Got a PlayerUpdate, but we couldn't find the player object!\n");
         return;
     }
 
-    player_obj->obj->position.x = player_update->position[0];
-    player_obj->obj->position.y = player_update->position[1];
-    player_obj->obj->position.z = player_update->position[2];
+    player_obj->obj->position.x = player->position[0];
+    player_obj->obj->position.y = player->position[1];
+    player_obj->obj->position.z = player->position[2];
 
-    player_obj->obj->rotation.x = player_update->rotation[0];
-    player_obj->obj->rotation.y = player_update->rotation[1];
-    player_obj->obj->rotation.z = player_update->rotation[2];
-    player_obj->obj->rotation.z = player_update->rotation[3];
+    player_obj->obj->rotation.x = player->rotation[0];
+    player_obj->obj->rotation.y = player->rotation[1];
+    player_obj->obj->rotation.z = player->rotation[2];
+    player_obj->obj->rotation.w = player->rotation[3];
     
-    player_obj->obj->scale.x = player_update->scale[0];
-    player_obj->obj->scale.y = player_update->scale[1];
-    player_obj->obj->scale.z = player_update->scale[2];
+    player_obj->obj->scale.x = player->scale[0];
+    player_obj->obj->scale.y = player->scale[1];
+    player_obj->obj->scale.z = player->scale[2];
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "player %d update:\n", player_obj->id);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew position: %f %f %f\n", player_update->position[0], player_update->position[1], player_update->position[2]);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew rotation: %f %f %f %f\n", player_update->rotation[0], player_update->rotation[1], player_update->rotation[2], player_update->rotation[3]);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew scale: %f %f %f\n", player_update->scale[0], player_update->scale[1], player_update->scale[2]);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew position: %f %f %f\n", player->position[0], player->position[1], player->position[2]);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew rotation: %f %f %f %f\n", player->rotation[0], player->rotation[1], player->rotation[2], player->rotation[3]);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew scale: %f %f %f\n", player->scale[0], player->scale[1], player->scale[2]);
 }
 
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
@@ -610,7 +593,7 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     }
 
     NETSetClientDisconnectCallback(GoToMainMenu);
-    NETSetClientDataCallback(OnNetData);
+    NETSetClientUpdateCallback(OnPlayerUpdate);
 
     return true;
 }
