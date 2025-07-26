@@ -1,5 +1,6 @@
 CC      ?= gcc
 CXX	?= g++
+GLSLC	?= glslc
 
 DEBUG  	?= 1
 # https://stackoverflow.com/a/1079861
@@ -56,11 +57,7 @@ $(TARGET): shaders gamenetworkingsockets $(OBJ)
 clean:
 	rm -rf $(BUILDDIR)/$(TARGET) $(OBJ)
 
-shaders: $(SPV)
-%.vert.spv: %.vert
-	glslangValidator -V $< -o $@
+shaders:
+	for f in $(SHADERS); do $(GLSLC) $$f -o $$f.spv; done
 
-%.frag.spv: %.frag
-	glslangValidator -V $< -o $@
-
-.PHONY: $(TARGET) clean gamenetworkingsockets all
+.PHONY: $(TARGET) clean gamenetworkingsockets shaders all
