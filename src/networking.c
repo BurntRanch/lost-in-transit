@@ -5,6 +5,9 @@
 
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_stdinc.h>
+#include <cglm/quat.h>
+#include <cglm/types.h>
+#include <cglm/vec3.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -34,6 +37,8 @@ struct HelloPacket {
     vec3 position;
     vec4 rotation;
     vec3 scale;
+
+    enum MovementDirection direction;
 };
 
 /* Sent by the server. */
@@ -56,14 +61,31 @@ struct TransitionPacket {
     enum TransDestination dest;
 };
 
+/* requested by a player */
+struct MovementUpdatePacket {
+    enum PacketType type;
+
+    enum MovementDirection direction;
+};
+
 /* sent by the server when a players state updates */
 struct PlayerUpdate {
-    enum PacketType type;
     int id;
 
     vec3 position;
     vec4 rotation;
     vec3 scale;
+
+    enum MovementDirection direction;
+};
+
+struct PlayerUpdatesPacket {
+    enum PacketType type;
+
+    /* amount of updates in this packet */
+    size_t update_count;
+
+    /* this packet is followed by PlayerUpdate structs. */
 };
 
 static void (*server_disconnect_callback)(const ConnectionHandle, const char *const) = NULL;
@@ -250,7 +272,7 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle) {
 
             /* watch how the server overrides our constant 4500 ID.
              * the model values (pos/rot/sca) are ignored by the server */
-            struct HelloPacket packet = {PACKET_TYPE_HELLO, handle, 4500, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
+            struct HelloPacket packet = {PACKET_TYPE_HELLO, handle, 4500, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE, MOVEMENT_COMPLETELY_STILL};
 
             if (!SRSendToConnection(handle, &packet, sizeof(packet))) {
                 /* :( */
@@ -281,12 +303,7 @@ static inline struct PlayersLinkedList *AddPlayer(const ConnectionHandle handle,
         }
     }
 
-    struct Player player = {handle, id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
-
-    /* TODO: this is just a test, don't forget to remove lol */
-    if (id == ADMIN_ID) {
-        player.position[0] -= 25;
-    }
+    struct Player player = {handle, id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE, MOVEMENT_COMPLETELY_STILL};
 
     struct PlayersLinkedList *player_list = AllocPlayersLinkedList(&player);
 
@@ -311,7 +328,7 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
     }
 
     struct HelloPacket packet = {PACKET_TYPE_HELLO, hello_packet->server_handle, player_list->ts.id,
-                                    {*player_list->ts.position}, {*player_list->ts.rotation}, {*player_list->ts.scale}};
+                                    {*player_list->ts.position}, {*player_list->ts.rotation}, {*player_list->ts.scale}, player_list->ts.active_direction};
     /* send the player hello packets for every existing player so they catch up */
     while (last_list) {
         packet.server_handle = last_list->ts.handle;
@@ -343,7 +360,7 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
 }
 
 static inline void Client_HandleHelloPacket(const ConnectionHandle handle, const struct HelloPacket *const hello_packet) {
-    struct Player player = {hello_packet->server_handle, hello_packet->id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
+    struct Player player = {hello_packet->server_handle, hello_packet->id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE, hello_packet->direction};
 
     SDL_memcpy(player.position, hello_packet->position, sizeof(player.position));
     SDL_memcpy(player.rotation, hello_packet->rotation, sizeof(player.rotation));
@@ -378,7 +395,7 @@ static inline void Client_HandleDisconnectPacket(const ConnectionHandle handle, 
     }
 }
 
-static void HandlePacket(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size) {
+static void HandlePacket(const enum Role role, const ConnectionHandle handle, const void *const data, const Uint32 size) {
     if (size < sizeof(enum PacketType)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[%c]: Received malformed packet! (size < uint32)\n", role == NET_ROLE_SERVER ? 'S' : 'C');
         return; /* why */
@@ -424,7 +441,7 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
         case PACKET_TYPE_REQUEST_START:
             /* only clients can issue start requests */
             if (role == NET_ROLE_CLIENT) {
-                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (start request packet sent to server)\n");
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (start request packet sent by server)\n");
                 return;
             }
             /* There's no data, all we need to know is that this client requested to start the game. */
@@ -475,26 +492,66 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[S]: Received malformed packet! (player update packet sent to server)\n");
                 return;
             }
-            if (size < sizeof(struct PlayerUpdate)) {
+            if (size < sizeof(struct PlayerUpdatesPacket)) {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (size < sizeof(struct PlayerUpdatePacket))\n");
                 return;
             }
 
-            const struct PlayerUpdate *player_update_packet = data;
-            struct PlayersLinkedList *target_player = FindPlayerByID(players, player_update_packet->id);
+            const struct PlayerUpdatesPacket *player_updates_packet = data;
 
-            if (!target_player) {
-                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Can't find target of player update!\n");
+            /* if this struct isn't big enough to store its updates.. */
+            if (size < sizeof(struct PlayerUpdatesPacket) + (player_updates_packet->update_count * sizeof(struct PlayerUpdate))) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (size not big enough to hold updates)\n");
                 return;
             }
 
-            SDL_memcpy(target_player->ts.position, player_update_packet->position, sizeof(target_player->ts.position));
-            SDL_memcpy(target_player->ts.rotation, player_update_packet->rotation, sizeof(target_player->ts.rotation));
-            SDL_memcpy(target_player->ts.scale, player_update_packet->scale, sizeof(target_player->ts.scale));
+            const struct PlayerUpdate *player_updates = data + offsetof(struct PlayerUpdatesPacket, update_count) + sizeof(player_updates_packet->update_count);
 
-            if (client_update_callback) {
-                client_update_callback(handle, &target_player->ts);
+            for (size_t i = 0; i < player_updates_packet->update_count; i++) {
+                static const struct PlayerUpdate *player_update;
+                player_update = &player_updates[i];
+
+                struct PlayersLinkedList *target_player = FindPlayerByID(players, player_update->id);
+
+                if (!target_player) {
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Can't find target of player update!\n");
+                    return;
+                }
+
+                SDL_memcpy(target_player->ts.position, player_update->position, sizeof(target_player->ts.position));
+                SDL_memcpy(target_player->ts.rotation, player_update->rotation, sizeof(target_player->ts.rotation));
+                SDL_memcpy(target_player->ts.scale, player_update->scale, sizeof(target_player->ts.scale));
+
+                target_player->ts.active_direction = player_update->direction;
+
+                if (client_update_callback) {
+                    client_update_callback(handle, &target_player->ts);
+                }
             }
+
+            break;
+        case PACKET_TYPE_MOVEMENT_UPDATE:
+            if (role == NET_ROLE_CLIENT) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (movement update sent from server!)");
+                return;
+            }
+            if (size < sizeof(struct MovementUpdatePacket)) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[S]: Received malformed packet! (size < sizeof(struct MovementUpdatePacket))");
+                return;
+            }
+
+            const struct MovementUpdatePacket *movement_update_packet = data;
+            struct PlayersLinkedList *target_player = FindPlayerByHandle(players, handle);
+
+            if (!target_player) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[S]: Can't find movement update packet target!\n");
+                return;
+            }
+
+            /* TODO: some validation, i guess?
+             * Would it even be necessary? If the player isn't allowed to move, the server wouldn't even attempt to move them. */
+
+            target_player->ts.active_direction = movement_update_packet->direction;
 
             break;
         default:
@@ -503,41 +560,107 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
     }
 }
 
-void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size) {
+void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const Uint32 size) {
     HandlePacket(role, handle, data, size);
 }
 
-/* send an update to all clients */
-static void UpdatePlayer(const struct Player *const player) {
-    struct PlayerUpdate packet = {PACKET_TYPE_PLAYER_UPDATE, player->id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE};
-
-    SDL_memcpy(packet.position, player->position, sizeof(packet.position));
-    SDL_memcpy(packet.rotation, player->rotation, sizeof(packet.rotation));
-    SDL_memcpy(packet.scale, player->scale, sizeof(packet.scale));
-
-    if (!SRSendMessageToClients(&packet, sizeof(packet))) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to send Player Update packet to clients!\n");
-        return;
-    }
+enum MovementDirection NETGetDirection() {
+    return client_self ? client_self->active_direction : MOVEMENT_COMPLETELY_STILL;
 }
 
-static bool pong_direction_forward = false;
+void NETChangeMovement(enum MovementDirection direction) {
+    /* TODO: don't send, change a variable and wait for the next tick (basically, create client ticks first) */
+
+    static struct MovementUpdatePacket packet = {PACKET_TYPE_MOVEMENT_UPDATE, MOVEMENT_COMPLETELY_STILL};
+    packet.direction = direction;
+
+    SRSendToConnection(client_connection, &packet, sizeof(packet));
+}
+
+static struct PlayerUpdate *server_player_updates = NULL;
+static size_t server_player_updates_count = 0;
+
+/* schedule an update for all clients (they'll be sent in bulk when FlushPlayerUpdates is called) */
+static void AddPlayerUpdate(const struct Player *const player) {
+    /* we're about to surpass a multiple of 32, resize the array. */
+    if (server_player_updates_count % 32 == 0) {
+        struct PlayerUpdate *new_array = SDL_malloc(sizeof(struct PlayerUpdate) * (int)SDL_ceilf((server_player_updates_count + 1) / 32.f) * 32);
+
+        if (server_player_updates) {
+            SDL_memcpy(new_array, server_player_updates, server_player_updates_count * sizeof(struct PlayerUpdate));
+
+            SDL_free(server_player_updates);
+        }
+
+        server_player_updates = new_array;
+    }
+
+    struct PlayerUpdate *update = &server_player_updates[server_player_updates_count];
+    *update = (struct PlayerUpdate){player->id, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE, player->active_direction};
+
+    SDL_memcpy(update->position, player->position, sizeof(update->position));
+    SDL_memcpy(update->rotation, player->rotation, sizeof(update->rotation));
+    SDL_memcpy(update->scale, player->scale, sizeof(update->scale));
+
+    server_player_updates_count++;
+}
+
+static void FlushPlayerUpdates() {
+    size_t size = sizeof(struct PlayerUpdatesPacket) + (server_player_updates_count * sizeof(struct PlayerUpdate));
+
+    struct PlayerUpdatesPacket *packet = SDL_malloc(size);
+    packet->type = PACKET_TYPE_PLAYER_UPDATE;
+    packet->update_count = server_player_updates_count;
+
+    SDL_memcpy((void *)packet + sizeof(struct PlayerUpdatesPacket), server_player_updates, server_player_updates_count * sizeof(struct PlayerUpdate));
+
+    if (server_player_updates) {
+        SDL_free(server_player_updates);
+
+        server_player_updates = NULL;
+        server_player_updates_count = 0;
+    }
+
+    SRSendMessageToClients(packet, size);
+
+    SDL_free(packet);
+}
+
+/* Move the player in their requested direction */
+static inline void TickPlayerMovement(struct Player *const player) {
+    vec3 direction;
+    glm_vec3_zero(direction);
+    
+    if (player->active_direction & MOVEMENT_LEFT) {
+        glm_vec3_add(direction, (vec3){0, 0, 1}, direction);
+    }
+    if (player->active_direction & MOVEMENT_RIGHT) {
+        glm_vec3_add(direction, (vec3){0, 0, -1}, direction);
+    }
+    if (player->active_direction & MOVEMENT_FORWARD) {
+        glm_vec3_add(direction, (vec3){-1, 0, 0}, direction);
+    }
+    if (player->active_direction & MOVEMENT_BACKWARD) {
+        glm_vec3_add(direction, (vec3){1, 0, 0}, direction);
+    }
+
+    /* use 'rotation' to decide where the directions are (if we're looking up, 'forward' should be upward) */
+//    static mat3 rot_matrix;
+//    glm_quat_mat3(player->rotation, rot_matrix);
+//    glm_vec3_rotate_m3(rot_matrix, direction, direction);
+    glm_vec3_normalize(direction);
+
+    glm_vec3_add(player->position, direction, player->position);
+}
+
 static inline void TickIntroStage() {
-    struct PlayersLinkedList *admin_player_list = FindPlayerByID(players, 4500);
+    struct PlayersLinkedList *head = players;
 
-    /* admin probably didn't join yet, otherwise this should never happen */
-    if (!admin_player_list) {
-        return;
+    for (; head; head = head->next) {
+        TickPlayerMovement(&head->ts);
+
+        AddPlayerUpdate(&head->ts);
     }
-
-    if (25 <= admin_player_list->ts.position[0] || admin_player_list->ts.position[0] <= -25) {
-        admin_player_list->ts.position[0] = (pong_direction_forward ? -25 : 25);
-        pong_direction_forward = !pong_direction_forward;
-    }
-
-    admin_player_list->ts.position[0] += (1.0/NETWORKING_TICKRATE) * (pong_direction_forward ? -10 : 10);
-
-    UpdatePlayer(&admin_player_list->ts);
 }
 
 void NETTickServer() {
@@ -548,6 +671,8 @@ void NETTickServer() {
         default:
             ;
     }
+
+    FlushPlayerUpdates();
 }
 
 const struct PlayersLinkedList *NETGetPlayers() {

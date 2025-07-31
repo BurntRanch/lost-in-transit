@@ -21,12 +21,22 @@ enum Role {
     NET_ROLE_CLIENT
 };
 
+/* bitmask representing movement direction */
+enum MovementDirection {
+    MOVEMENT_COMPLETELY_STILL = 0,
+    MOVEMENT_FORWARD = 1,
+    MOVEMENT_BACKWARD = 2,
+    MOVEMENT_RIGHT = 4,
+    MOVEMENT_LEFT = 8,
+};
+
 enum PacketType {
     PACKET_TYPE_HELLO,
     PACKET_TYPE_DISCONNECT,
     PACKET_TYPE_REQUEST_START,
     PACKET_TYPE_TRANSITION,
     PACKET_TYPE_PLAYER_UPDATE,
+    PACKET_TYPE_MOVEMENT_UPDATE,
 };
 
 enum TransDestination {
@@ -41,6 +51,9 @@ struct Player {
     vec3 position;
     vec4 rotation;
     vec3 scale;
+
+    /* the direction this player is moving in. used to update the `position` value each tick. */
+    enum MovementDirection active_direction;
 };
 
 struct PlayersLinkedList {
@@ -88,7 +101,13 @@ void NETHandleDisconnect(const enum Role role, const ConnectionHandle handle, co
 void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
 
 /* Called by steam.cc */
-void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const size_t size);
+void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const Uint32 size);
+
+/* Get the direction we're going at. completely still may be returned IF we aren't even connected */
+enum MovementDirection NETGetDirection();
+
+/* Ask the server to change our movement direction. */
+void NETChangeMovement(enum MovementDirection direction);
 
 void NETTickServer();
 

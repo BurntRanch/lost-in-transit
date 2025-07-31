@@ -4,6 +4,7 @@
 #include "steam/steamclientpublic.h"
 #include "steam/steamtypes.h"
 
+#include <SDL3/SDL_log.h>
 #include <SDL3/SDL_stdinc.h>
 #include <algorithm>
 #include <assert.h>
@@ -26,6 +27,9 @@ static std::vector<HSteamNetConnection> server_clients;
 static HSteamNetConnection client_connection = k_HSteamNetConnection_Invalid;
 static SteamNetworkingConfigValue_t client_config;
 
+static ISteamNetworkingSockets *server_instance;
+static ISteamNetworkingSockets *client_instance;
+
 static void Server_NetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo) {
     switch (pInfo->m_info.m_eState) {
         case k_ESteamNetworkingConnectionState_None:
@@ -42,20 +46,20 @@ static void Server_NetConnectionStatusChanged(SteamNetConnectionStatusChangedCal
                 }
             }
 
-            SteamNetworkingSockets()->CloseConnection(pInfo->m_hConn, 0, NULL, false);
+            server_instance->CloseConnection(pInfo->m_hConn, 0, NULL, false);
             break;
         case k_ESteamNetworkingConnectionState_Connecting:
             /* if this leads to some DoS attack where people can "pretend to connect twice" please do not talk to me */
             assert(std::find(server_clients.begin(), server_clients.end(), pInfo->m_hConn) == server_clients.end());
 
-            if (SteamNetworkingSockets()->AcceptConnection(pInfo->m_hConn) != k_EResultOK) {
-                SteamNetworkingSockets()->CloseConnection(pInfo->m_hConn, 0, NULL, false);
+            if (server_instance->AcceptConnection(pInfo->m_hConn) != k_EResultOK) {
+                server_instance->CloseConnection(pInfo->m_hConn, 0, NULL, false);
                 fprintf(stderr, "Failed to accept client connection!\n");
                 break;
             }
 
-            if (!SteamNetworkingSockets()->SetConnectionPollGroup(pInfo->m_hConn, server_poll_group)) {
-                SteamNetworkingSockets()->CloseConnection(pInfo->m_hConn, 0, NULL, false);
+            if (!server_instance->SetConnectionPollGroup(pInfo->m_hConn, server_poll_group)) {
+                server_instance->CloseConnection(pInfo->m_hConn, 0, NULL, false);
                 fprintf(stderr, "Failed to assign poll group to client connection!\n");
                 break;
             }
@@ -82,7 +86,7 @@ static void Client_NetConnectionStatusChanged(SteamNetConnectionStatusChangedCal
                 NETHandleDisconnect(NET_ROLE_CLIENT, pInfo->m_hConn, pInfo->m_info.m_szEndDebug);
             }
 
-            SteamNetworkingSockets()->CloseConnection(pInfo->m_hConn, 0, NULL, false);
+            client_instance->CloseConnection(pInfo->m_hConn, 0, NULL, false);
 
             client_connection = k_HSteamNetConnection_Invalid;
             break;
@@ -106,6 +110,9 @@ bool SRInitGNS(void) {
     server_config.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void *)Server_NetConnectionStatusChanged);
     client_config.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void *)Client_NetConnectionStatusChanged);
 
+    server_instance = SteamNetworkingSockets();
+    client_instance = SteamNetworkingSockets();
+
     return true;
 }
 
@@ -119,13 +126,13 @@ char *SRStartServer(Uint16 port) {
     ipAddr.ParseString("127.0.0.1");
     ipAddr.m_port = port;
 
-    server_listen_socket = SteamNetworkingSockets()->CreateListenSocketIP(ipAddr, 1, &server_config);
+    server_listen_socket = server_instance->CreateListenSocketIP(ipAddr, 1, &server_config);
     if (server_listen_socket == k_HSteamListenSocket_Invalid) {
         fprintf(stderr, "Failed to create socket on port %d.\n", port);
         return NULL;
     }
 
-    server_poll_group = SteamNetworkingSockets()->CreatePollGroup();
+    server_poll_group = server_instance->CreatePollGroup();
     if (server_poll_group == k_HSteamNetPollGroup_Invalid) {
         fprintf(stderr, "Failed to create server poll group.");
 
@@ -142,7 +149,7 @@ char *SRStartServer(Uint16 port) {
 bool SRSendMessageToClients(void *data, const int size) {
     std::vector<SteamNetworkingMessage_t *> messages(server_clients.size());
     std::vector<int64> results(server_clients.size());
-    
+
     for (size_t i = 0; i < server_clients.size(); i++) {
         messages[i] = SteamNetworkingUtils()->AllocateMessage(size);
         memcpy(messages[i]->m_pData, data, size);
@@ -150,7 +157,7 @@ bool SRSendMessageToClients(void *data, const int size) {
         messages[i]->m_conn = server_clients[i];
     }
 
-    SteamNetworkingSockets()->SendMessages(messages.size(), messages.data(), results.data());
+    server_instance->SendMessages(messages.size(), messages.data(), results.data());
 
     /* Is there any error? */
     if (std::any_of(results.begin(), results.end(), [] (int64 &result) { return result < 0; })) {
@@ -161,8 +168,7 @@ bool SRSendMessageToClients(void *data, const int size) {
 }
 
 void SRDisconnectClient(const ConnectionHandle handle, const char * pReason) {
-    NETCleanupClient();
-    SteamNetworkingSockets()->CloseConnection(handle, 0, pReason, true);
+    server_instance->CloseConnection(handle, 0, pReason, true);
 }
 
 bool SRIsHostingServer(void) {
@@ -173,14 +179,14 @@ void SRStopServer(void) {
     NETCleanupServer();
 
     for (const HSteamNetConnection &conn : server_clients) {
-        SteamNetworkingSockets()->CloseConnection(conn, 0, "Server shutting down", true);
+        server_instance->CloseConnection(conn, 0, "Server shutting down", true);
         server_clients.erase(server_clients.begin());
     }
 
-    SteamNetworkingSockets()->DestroyPollGroup(server_poll_group);
+    server_instance->DestroyPollGroup(server_poll_group);
     server_poll_group = k_HSteamNetPollGroup_Invalid;
 
-    SteamNetworkingSockets()->CloseListenSocket(server_listen_socket);
+    server_instance->CloseListenSocket(server_listen_socket);
     server_listen_socket = k_HSteamListenSocket_Invalid;
 }
 
@@ -190,7 +196,7 @@ static bool ConnectToServer(const SteamNetworkingIPAddr * const pAddress) {
         return false;
     }
 
-    if ((client_connection = SteamNetworkingSockets()->ConnectByIPAddress(*pAddress, 1, &client_config)) == k_HSteamNetConnection_Invalid) {
+    if ((client_connection = client_instance->ConnectByIPAddress(*pAddress, 1, &client_config)) == k_HSteamNetConnection_Invalid) {
         fprintf(stderr, "Failed to connect to server!\n");
         return false;
     }
@@ -219,8 +225,9 @@ bool SRIsConnectedToServer(void) {
 }
 
 void SRDisconnectFromServer(void) {
+    NETCleanupClient();
     if (client_connection != k_HSteamNetConnection_Invalid) {
-        SteamNetworkingSockets()->CloseConnection(client_connection, 0, "Client Disconnect", true);
+        client_instance->CloseConnection(client_connection, 0, "Client Disconnect", true);
         client_connection = k_HSteamNetConnection_Invalid;
     }
 
@@ -229,7 +236,8 @@ void SRDisconnectFromServer(void) {
 }
 
 bool SRSendToConnection(const ConnectionHandle handle, const void * const data, const size_t size) {
-    EResult send_result = SteamNetworkingSockets()->SendMessageToConnection(handle, data, size, k_nSteamNetworkingSend_Reliable, NULL);
+    ISteamNetworkingSockets *instance = handle == client_connection ? client_instance : server_instance;
+    EResult send_result = instance->SendMessageToConnection(handle, data, size, k_nSteamNetworkingSend_Reliable, NULL);
     if (send_result != k_EResultOK) {
         fprintf(stderr, "Failed to send message! (Steam Error Code: %d)\n", send_result);
 
@@ -242,9 +250,9 @@ bool SRSendToConnection(const ConnectionHandle handle, const void * const data, 
 bool SRPollConnections(void) {
     if (server_poll_group != k_HSteamNetPollGroup_Invalid) {
         SteamNetworkingMessage_t *messages = nullptr;
-        int msgCount = SteamNetworkingSockets()->ReceiveMessagesOnPollGroup(server_poll_group, &messages, 5);
+        int msgCount = server_instance->ReceiveMessagesOnPollGroup(server_poll_group, &messages, 5);
 
-        if (msgCount < -1) {
+        if (msgCount < 0) {
             fprintf(stderr, "Failed to receive messages from poll group!\n");
             return false;
         }
@@ -260,20 +268,22 @@ bool SRPollConnections(void) {
 
     if (client_connection != k_HSteamNetConnection_Invalid) {
         SteamNetworkingMessage_t *message = nullptr;
-        int msgCount = SteamNetworkingSockets()->ReceiveMessagesOnConnection(client_connection, &message, 1);
+        int msgCount = client_instance->ReceiveMessagesOnConnection(client_connection, &message, 1);
 
-        if (msgCount < -1) {
+        if (msgCount < 0) {
             fprintf(stderr, "Failed to receive messages from client connection!\n");
             return false;
         }
 
-        if (message && msgCount == 1) {
+        if (message) {
             NETHandleData(NET_ROLE_CLIENT, message->GetConnection(), message->GetData(), message->GetSize());
+
             message->Release();
         }
     }
 
-    SteamNetworkingSockets()->RunCallbacks();
+    server_instance->RunCallbacks();
+    client_instance->RunCallbacks();
 
     return true;
 }

@@ -403,7 +403,21 @@ bool LEStepRender(void) {
 
             window_resized = true;
         } else if (event.type == SDL_EVENT_KEY_DOWN) {
+            /* start moving in the direction we want */
+            enum MovementDirection direction = NETGetDirection();
             switch (event.key.scancode) {
+                case SDL_SCANCODE_W:
+                    direction |= MOVEMENT_FORWARD;
+                    break;
+                case SDL_SCANCODE_A:
+                    direction |= MOVEMENT_LEFT;
+                    break;
+                case SDL_SCANCODE_S:
+                    direction |= MOVEMENT_BACKWARD;
+                    break;
+                case SDL_SCANCODE_D:
+                    direction |= MOVEMENT_RIGHT;
+                    break;
                 case SDL_SCANCODE_TAB:
                     Navigate(event.key.mod & SDL_KMOD_SHIFT);
                     break;
@@ -413,8 +427,32 @@ bool LEStepRender(void) {
                     break;
                 default:;
             }
+
+            if (scene_loaded == SCENE3D_INTRO)
+                NETChangeMovement(direction);
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
+        } else if (event.type == SDL_EVENT_KEY_UP) {
+            /* stop moving in the direction */
+            enum MovementDirection direction = NETGetDirection();
+            switch (event.key.scancode) {
+                case SDL_SCANCODE_W:
+                    direction &= ~MOVEMENT_FORWARD;
+                    break;
+                case SDL_SCANCODE_A:
+                    direction &= ~MOVEMENT_LEFT;
+                    break;
+                case SDL_SCANCODE_S:
+                    direction &= ~MOVEMENT_BACKWARD;
+                    break;
+                case SDL_SCANCODE_D:
+                    direction &= ~MOVEMENT_RIGHT;
+                    break;
+                default:;
+            }
+
+            if (scene_loaded == SCENE3D_INTRO)
+                NETChangeMovement(direction);
         }
     }
 
