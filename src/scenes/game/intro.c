@@ -369,6 +369,9 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
         if (!CreateIndexBuffer(indices, index_count, &pObjectOut->index_buffers[mesh_idx])) {
             return false;
         }
+
+        SDL_free(vertices);
+        SDL_free(indices);
     }
 
     return true;
@@ -485,7 +488,7 @@ static inline bool LoadScene() {
 
     if (!players) {
         /* Should be impossible.. */
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to get players! no players found! (\?\?\?)");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to get players! no players found! (\?\?\?)\n");
         return false;
     }
 
@@ -661,6 +664,33 @@ bool IntroRender(void) {
 
 void IntroCleanup(void) {
     /* TODO: free scene objects */
+    for (; objects_count > 0; objects_count--) {
+        struct Object *object = objects_array[objects_count - 1];
+
+        for (; object->buffers_count > 0; object->buffers_count--) {
+            SDL_ReleaseGPUBuffer(gpu_device, object->vertex_buffers[object->buffers_count - 1].buffer);
+            SDL_ReleaseGPUBuffer(gpu_device, object->index_buffers[object->buffers_count - 1].buffer);
+        }
+        SDL_free(object->vertex_buffers);
+        SDL_free(object->index_buffers);
+
+        SDL_free(object);
+    }
+    if (objects_array) {
+        SDL_free(objects_array);
+        objects_array = NULL;
+    }
+
+    for (; player_objects; player_objects = player_objects->next) {
+        if (player_objects->prev) {
+            SDL_free(player_objects->prev);
+        }
+    }
+    /* the loop above won't free the last element, so we have to do it manually */
+    if (player_objects) {
+        SDL_free(player_objects);
+        player_objects = NULL;
+    }
 
     SDL_ReleaseGPUGraphicsPipeline(gpu_device, test_pipeline);
 
