@@ -110,6 +110,7 @@ enum MovementDirection NETGetDirection();
 void NETChangeMovement(enum MovementDirection direction);
 
 void NETTickServer();
+void NETTickClient();
 
 const struct PlayersLinkedList *NETGetPlayers();
 

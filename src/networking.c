@@ -105,6 +105,8 @@ static struct PlayersLinkedList *players = NULL;
 /* who are we to the server? (in the players list) */
 static struct Player *client_self;
 
+static enum MovementDirection client_wanted_direction = MOVEMENT_COMPLETELY_STILL;
+
 static enum TransDestination server_current_stage = TRANS_DEST_NONE;
 
 /* Creates a linked list object. You can append this to another linked list and so on. */
@@ -518,11 +520,15 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
                     return;
                 }
 
-                SDL_memcpy(target_player->ts.position, player_update->position, sizeof(target_player->ts.position));
-                SDL_memcpy(target_player->ts.rotation, player_update->rotation, sizeof(target_player->ts.rotation));
-                SDL_memcpy(target_player->ts.scale, player_update->scale, sizeof(target_player->ts.scale));
+                /* We can kind of cheat this, because we're already updating this list in the internal server.
+                 * This is also to prevent the client from interfering with the server. */
+                if (!SRIsHostingServer()) {
+                    SDL_memcpy(target_player->ts.position, player_update->position, sizeof(target_player->ts.position));
+                    SDL_memcpy(target_player->ts.rotation, player_update->rotation, sizeof(target_player->ts.rotation));
+                    SDL_memcpy(target_player->ts.scale, player_update->scale, sizeof(target_player->ts.scale));
 
-                target_player->ts.active_direction = player_update->direction;
+                    target_player->ts.active_direction = player_update->direction;
+                }
 
                 if (client_update_callback) {
                     client_update_callback(handle, &target_player->ts);
@@ -569,12 +575,7 @@ enum MovementDirection NETGetDirection() {
 }
 
 void NETChangeMovement(enum MovementDirection direction) {
-    /* TODO: don't send, change a variable and wait for the next tick (basically, create client ticks first) */
-
-    static struct MovementUpdatePacket packet = {PACKET_TYPE_MOVEMENT_UPDATE, MOVEMENT_COMPLETELY_STILL};
-    packet.direction = direction;
-
-    SRSendToConnection(client_connection, &packet, sizeof(packet));
+    client_wanted_direction = direction;
 }
 
 static struct PlayerUpdate *server_player_updates = NULL;
@@ -673,6 +674,24 @@ void NETTickServer() {
     }
 
     FlushPlayerUpdates();
+}
+
+void NETTickClient() {
+    if (!client_self) {
+        return;
+    }
+
+    /* our direction is correct */
+    if (client_self->active_direction == client_wanted_direction) {
+        return;
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Updating movement!\n");
+
+    static struct MovementUpdatePacket packet = {PACKET_TYPE_MOVEMENT_UPDATE, MOVEMENT_COMPLETELY_STILL};
+    packet.direction = client_wanted_direction;
+
+    SRSendToConnection(client_connection, &packet, sizeof(packet));
 }
 
 const struct PlayersLinkedList *NETGetPlayers() {
