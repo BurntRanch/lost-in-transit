@@ -428,8 +428,7 @@ bool LEStepRender(void) {
                 default:;
             }
 
-            if (scene_loaded == SCENE3D_INTRO)
-                NETChangeMovement(direction);
+            NETChangeMovement(direction);
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
         } else if (event.type == SDL_EVENT_KEY_UP) {
@@ -451,8 +450,7 @@ bool LEStepRender(void) {
                 default:;
             }
 
-            if (scene_loaded == SCENE3D_INTRO)
-                NETChangeMovement(direction);
+            NETChangeMovement(direction);
         }
     }
 
@@ -460,12 +458,13 @@ bool LEStepRender(void) {
         return false;
     }
 
-    if (!SRPollConnections()) {
-        return false;
-    }
-
     while (time_since_network_tick >= 1.0/NETWORKING_TICKRATE) {
+        if (!SRPollConnections()) {
+            return false;
+        }
+    
         NETTickServer();
+        NETTickClient();
 
         time_since_network_tick -= 1.0/NETWORKING_TICKRATE;
     }

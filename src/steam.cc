@@ -260,6 +260,12 @@ bool SRPollConnections(void) {
         for (int i = 0; i < msgCount; i++) {
             SteamNetworkingMessage_t *message = &messages[i];
 
+            /* WHY AM I GETTING NULL/CORRUPT MESSAGES?
+             * CAN'T EVEN RELEASE, WE JUST HAVE TO DEAL WITH IT:tm: */
+            if (message->GetConnection() == 0) {
+                continue;
+            }
+
             NETHandleData(NET_ROLE_SERVER, message->GetConnection(), message->GetData(), message->GetSize());
 
             message->Release();
