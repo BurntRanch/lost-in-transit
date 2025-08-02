@@ -1,0 +1,125 @@
+name: Build LIT (cross-platform)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update && sudo apt-get purge firefox -y
+          sudo apt-get install -y build-essential protobuf-compiler libprotobuf-dev cmake libshaderc-dev glslang-tools make ninja-build git
+          wget https://github.com/libsdl-org/SDL/releases/download/release-3.2.18/SDL3-3.2.18.tar.gz
+          tar -xvzf SDL3-3.2.18.tar.gz
+          cd SDL3-3.2.18
+          mkdir build && cd build
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_UNIX_CONSOLE_BUILD=ON
+          ninja
+          sudo ninja install
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install cmake make ninja sdl3 git protobuf glslang shaderc llvm
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-gcc
+            git
+            make
+            cmake
+            ninja
+            patch
+            mingw-w64-x86_64-shaderc
+            mingw-w64-x86_64-glslang
+            mingw-w64-x86_64-protobuf
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-sdl3
+            mingw-w64-x86_64-openssl
+
+      - name: Setup Windows Build Environment
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          echo "PATH=/mingw64/bin:$PATH" >> $GITHUB_ENV
+          echo "CC=/mingw64/bin/gcc.exe" >> $GITHUB_ENV
+          echo "CXX=/mingw64/bin/g++.exe" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=/mingw64" >> $GITHUB_ENV
+          echo "OPENSSL_ROOT_DIR=/mingw64" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=/mingw64/include" >> $GITHUB_ENV
+          echo "OPENSSL_LIBRARIES=/mingw64/lib" >> $GITHUB_ENV
+
+      - name: Build and install cglm (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          git clone https://github.com/recp/cglm.git
+          cd cglm
+          mkdir build && cd build
+          cmake -G Ninja .. \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/usr/local
+          ninja
+          sudo ninja install
+
+      - name: Build and install cglm (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          git clone https://github.com/recp/cglm.git
+          cd cglm
+          mkdir build && cd build
+          cmake -G Ninja .. \
+              -DCMAKE_C_COMPILER="$CC" \
+              -DCMAKE_CXX_COMPILER="$CXX" \
+              -DCMAKE_INSTALL_PREFIX="$CMAKE_PREFIX_PATH" \
+              -DCMAKE_BUILD_TYPE=Release
+          ninja
+          ninja install
+
+      - name: Build project (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          make all
+
+      - name: Build project (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          make all CXX=clang++ CC=clang
+
+      - name: Verify OpenSSL
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          /mingw64/bin/openssl version
+          nm -gD /mingw64/bin/libcrypto-3-x64.dll | grep EVP_MD_CTX_free || nm -g /mingw64/lib/libcrypto.a | grep EVP_MD_CTX_free
+
+      - name: Build project (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          sed -i 's/check_symbol_exists(EVP_MD_CTX_free openssl\/evp.h OPENSSL_NEW_ENOUGH)/set(OPENSSL_NEW_ENOUGH TRUE)/' GameNetworkingSockets/CMakeLists.txt
+          make all CC="$CC" CXX="$CXX"
