@@ -607,13 +607,17 @@ static void AddPlayerUpdate(const struct Player *const player) {
 }
 
 static void FlushPlayerUpdates() {
+    if (!server_player_updates) {
+        return;
+    }
+
     size_t size = sizeof(struct PlayerUpdatesPacket) + (server_player_updates_count * sizeof(struct PlayerUpdate));
 
     struct PlayerUpdatesPacket *packet = SDL_malloc(size);
     packet->type = PACKET_TYPE_PLAYER_UPDATE;
     packet->update_count = server_player_updates_count;
 
-    SDL_memcpy((void *)packet + sizeof(struct PlayerUpdatesPacket), server_player_updates, server_player_updates_count * sizeof(struct PlayerUpdate));
+    SDL_memcpy(&packet[1], server_player_updates, server_player_updates_count * sizeof(struct PlayerUpdate));
 
     if (server_player_updates) {
         SDL_free(server_player_updates);

@@ -147,6 +147,9 @@ char *SRStartServer(Uint16 port) {
 }
 
 bool SRSendMessageToClients(void *data, const int size) {
+    if (server_clients.size() == 0) {
+        return true;
+    }
     std::vector<SteamNetworkingMessage_t *> messages(server_clients.size());
     std::vector<int64> results(server_clients.size());
 
@@ -249,26 +252,26 @@ bool SRSendToConnection(const ConnectionHandle handle, const void * const data, 
 
 bool SRPollConnections(void) {
     if (server_poll_group != k_HSteamNetPollGroup_Invalid) {
-        SteamNetworkingMessage_t *messages = nullptr;
-        int msgCount = server_instance->ReceiveMessagesOnPollGroup(server_poll_group, &messages, 5);
+        static int loops;
+        loops = 0;
 
-        if (msgCount < 0) {
-            fprintf(stderr, "Failed to receive messages from poll group!\n");
-            return false;
-        }
+        while (loops < 10) {
+            SteamNetworkingMessage_t *message = nullptr;
+            int msgCount = server_instance->ReceiveMessagesOnPollGroup(server_poll_group, &message, 1);
 
-        for (int i = 0; i < msgCount; i++) {
-            SteamNetworkingMessage_t *message = &messages[i];
+            if (msgCount < 0) {
+                fprintf(stderr, "Failed to receive message from poll group!\n");
+                return false;
+            }
 
-            /* WHY AM I GETTING NULL/CORRUPT MESSAGES?
-             * CAN'T EVEN RELEASE, WE JUST HAVE TO DEAL WITH IT:tm: */
-            if (message->GetConnection() == 0) {
-                continue;
+            if (msgCount == 0) {
+                break;
             }
 
             NETHandleData(NET_ROLE_SERVER, message->GetConnection(), message->GetData(), message->GetSize());
 
             message->Release();
+            loops++;
         }
     }
 
