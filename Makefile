@@ -8,7 +8,8 @@ DEBUG  	?= 1
 # WAY easier way to build debug and release builds
 ifeq ($(DEBUG), 1)
         BUILDDIR  = build/debug
-        CFLAGS := -ggdb3 -Wall -Wextra -Wpedantic -Wno-unused-parameter -DDEBUG=1 $(DEBUG_CFLAGS) $(CFLAGS)
+        CFLAGS := -ggdb3 -fsanitize=address,undefined -Wall -Wextra -Wpedantic -Wno-unused-parameter -DDEBUG=1 $(DEBUG_CFLAGS) $(CFLAGS)
+				LDFLAGS := -fsanitize=address,undefined
 else
 	# Check if an optimization flag is not already set
 	ifneq ($(filter -O%,$(CFLAGS)),)
@@ -27,14 +28,14 @@ SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
-LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
+LDFLAGS   	?= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
 LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lassimp -lcglm -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
 CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	 = $(CFLAGS)
 
 SHADER_DIR 	 = shaders
-SHADERS 	 = $(wildcard $(SHADER_DIR)/*.vert $(SHADER_DIR)/*.frag)
+SHADERS 	 = $(wildcard $(SHADER_DIR)/untextured/*.vert $(SHADER_DIR)/untextured/*.frag $(SHADER_DIR)/textured/*.vert $(SHADER_DIR)/textured/*.frag)
 SPV 		 = $(SHADERS:.vert=.vert.spv)
 SPV 		:= $(SPV:.frag=.frag.spv)
 # is macos?
