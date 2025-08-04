@@ -36,6 +36,7 @@ int main() {
     pLEGameFont = NULL;
 
     LECleanupScene();
+    LEDestroyGPU();
     LEDestroyWindow();
     SRStopServer();
     SRDisconnectFromServer();

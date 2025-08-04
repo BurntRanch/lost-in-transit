@@ -29,6 +29,7 @@
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_stdinc.h>
+
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include "steam.hh"
@@ -58,6 +59,11 @@ static bool InitGPURenderTexture() {
         LESwapchainTexture = NULL;
     }
 
+    if (LEDepthStencilTexture) {
+        SDL_ReleaseGPUTexture(gpu_device, LEDepthStencilTexture);
+        LEDepthStencilTexture = NULL;
+    }
+
     if (render_transferbuffer) {
         SDL_ReleaseGPUTransferBuffer(gpu_device, render_transferbuffer);
         render_transferbuffer = NULL;
@@ -79,8 +85,23 @@ static bool InitGPURenderTexture() {
     gpu_texture_create_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
     gpu_texture_create_info.layer_count_or_depth = 1;
 
+    static SDL_GPUTextureCreateInfo depth_stencil_texture_create_info;
+    depth_stencil_texture_create_info.type = SDL_GPU_TEXTURETYPE_2D;
+    depth_stencil_texture_create_info.props = 0;
+    depth_stencil_texture_create_info.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    depth_stencil_texture_create_info.width = (LESwapchainWidth = LEScreenWidth);
+    depth_stencil_texture_create_info.height = (LESwapchainHeight = LEScreenHeight);
+    depth_stencil_texture_create_info.format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+    depth_stencil_texture_create_info.num_levels = 1;
+    depth_stencil_texture_create_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    depth_stencil_texture_create_info.layer_count_or_depth = 1;
+    
     /* TODO: This keeps creating file descriptors, and doesn't close them. why? */
     if (!(LESwapchainTexture = SDL_CreateGPUTexture(gpu_device, &gpu_texture_create_info))) {
+        fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+    if (!(LEDepthStencilTexture = SDL_CreateGPUTexture(gpu_device, &depth_stencil_texture_create_info))) {
         fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
@@ -103,6 +124,28 @@ static bool InitGPURenderTexture() {
     return true;
 }
 
+void LEDestroyGPU(void) {
+    if (!gpu_device) {
+        return;
+    }
+
+    if (LESwapchainTexture) {
+        SDL_ReleaseGPUTexture(gpu_device, LESwapchainTexture);
+        LESwapchainTexture = NULL;
+    }
+    if (LEDepthStencilTexture) {
+        SDL_ReleaseGPUTexture(gpu_device, LEDepthStencilTexture);
+        LEDepthStencilTexture = NULL;
+    }
+    if (render_transferbuffer) {
+        SDL_ReleaseGPUTransferBuffer(gpu_device, render_transferbuffer);
+        render_transferbuffer = NULL;
+    }
+
+    SDL_DestroyGPUDevice(gpu_device);
+    gpu_device = NULL;
+}
+
 void LEDestroyWindow(void) {
     if (window) {
         SDL_DestroyWindow(window);
@@ -110,13 +153,14 @@ void LEDestroyWindow(void) {
 
         /* we have to set the other values to NULL because they're implicitly destroyed */
         renderer = NULL;
+        render_texture = NULL;
     }
 }
 
 bool LEInitWindow(void) {
-    if (window) {
-        LEDestroyWindow();
-    }
+    LEDestroyWindow();
+
+    LEDestroyGPU();
 
     if (LECommandBuffer) {
         LECommandBuffer = NULL;
@@ -336,8 +380,17 @@ void LECleanupScene(void) {
     color_target_info.store_op = SDL_GPU_STOREOP_STORE;
     color_target_info.texture = LESwapchainTexture;
 
+    static SDL_GPUDepthStencilTargetInfo depth_stencil_target_info;
+    depth_stencil_target_info.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
+    depth_stencil_target_info.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    depth_stencil_target_info.clear_depth = 1.0f;
+    depth_stencil_target_info.cycle = false;
+    depth_stencil_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+    depth_stencil_target_info.store_op = SDL_GPU_STOREOP_STORE;
+    depth_stencil_target_info.texture = LEDepthStencilTexture;
+
     static SDL_GPURenderPass *render_pass;
-    if (!(render_pass = SDL_BeginGPURenderPass(LECommandBuffer, &color_target_info, 1, NULL))) {
+    if (!(render_pass = SDL_BeginGPURenderPass(LECommandBuffer, &color_target_info, 1, &depth_stencil_target_info))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin render pass! (SDL Error: %s)\n", SDL_GetError());
         return;
     }
@@ -374,7 +427,7 @@ double LEFrametime = 0.0;
 static double time_since_network_tick = 0.0;
 
 SDL_GPUCommandBuffer *LECommandBuffer = NULL;
-SDL_GPUTexture *LESwapchainTexture = NULL;
+SDL_GPUTexture *LESwapchainTexture, *LEDepthStencilTexture = NULL;
 Uint32 LESwapchainWidth, LESwapchainHeight = 0;
 
 bool LEStepRender(void) {

@@ -15,7 +15,7 @@ extern double LEFrametime;
 
 /* Only used in 3D accelerated scenes. */
 extern SDL_GPUCommandBuffer *LECommandBuffer;
-extern SDL_GPUTexture *LESwapchainTexture;
+extern SDL_GPUTexture *LESwapchainTexture, *LEDepthStencilTexture;
 extern Uint32 LESwapchainWidth, LESwapchainHeight;
 
 /* Returns true on success. */
@@ -51,6 +51,8 @@ void LEScheduleLoadScene(const Uint8 scene);
  */
 bool LEStepRender(void);
 
+/* Destroy the GPU */
+void LEDestroyGPU(void);
 /* Destroy the window. */
 void LEDestroyWindow(void);
 /* Unload/Cleanup the current scene. */
