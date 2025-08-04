@@ -28,7 +28,7 @@ SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
-LDFLAGS   	?= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
+LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
 LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lassimp -lcglm -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
 CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
@@ -38,6 +38,7 @@ SHADER_DIR 	 = shaders
 SHADERS 	 = $(wildcard $(SHADER_DIR)/untextured/*.vert $(SHADER_DIR)/untextured/*.frag $(SHADER_DIR)/textured/*.vert $(SHADER_DIR)/textured/*.frag)
 SPV 		 = $(SHADERS:.vert=.vert.spv)
 SPV 		:= $(SPV:.frag=.frag.spv)
+
 # is macos?
 ifeq ($(UNAME_S),Darwin)
     LIBNAME     := dylib
@@ -55,16 +56,17 @@ else
       -G "Ninja"
 endif
 
+all: gamenetworkingsockets $(TARGET)
+
 gamenetworkingsockets:
 ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
 	mkdir -p $(BUILDDIR)
 	mkdir -p GameNetworkingSockets/build
 	cd GameNetworkingSockets && patch -p1 < ../fix-string_view-return.patch
 	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build $(GNS_FLAGS)
-	cmake --build GameNetworkingSockets/build --config Release
+	cmake --build GameNetworkingSockets/build
 	cd GameNetworkingSockets && patch -p1 -R < ../fix-string_view-return.patch
-	cp GameNetworkingSockets/build/bin/Release/GameNetworkingSockets.$(LIBNAME) $(BUILDDIR) || \
-	cp GameNetworkingSockets/build/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
+	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
 endif
 
 $(TARGET): shaders gamenetworkingsockets $(OBJ)
