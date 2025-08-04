@@ -108,14 +108,7 @@ jobs:
       - name: Build project (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          make all CXX=clang++ CC=clang
-
-      - name: Verify OpenSSL
-        if: matrix.os == 'windows-latest'
-        shell: msys2 {0}
-        run: |
-          /mingw64/bin/openssl version
-          nm -gD /mingw64/bin/libcrypto-3-x64.dll | grep EVP_MD_CTX_free || nm -g /mingw64/lib/libcrypto.a | grep EVP_MD_CTX_free
+          make all CXX=/opt/homebrew/opt/llvm/bin/clang++ CC=/opt/homebrew/opt/llvm/bin/clang
 
       - name: Build project (Windows)
         if: matrix.os == 'windows-latest'

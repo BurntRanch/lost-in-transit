@@ -46,24 +46,20 @@ else ifeq ($(UNAME_S),Linux)
     LIBNAME     := so
 else
     LIBNAME     := dll
-    GNS_FLAGS   := -DCMAKE_PREFIX_PATH=/mingw64 \
-      -DOPENSSL_ROOT_DIR=/mingw64 \
-      -DCMAKE_SYSTEM_NAME=Windows \
+    MINGW_FLAGS := -DCMAKE_SYSTEM_NAME=Windows \
       -DProtobuf_PROTOC_EXECUTABLE=/mingw64/bin/protoc.exe \
       -DOPENSSL_USE_STATIC_LIBS=ON \
-      -DCMAKE_C_COMPILER=/mingw64/bin/gcc.exe \
-      -DCMAKE_CXX_COMPILER=/mingw64/bin/g++.exe \
       -G "Ninja"
 endif
 
-all: gamenetworkingsockets $(TARGET)
+all: gamenetworkingsockets shaders $(TARGET)
 
 gamenetworkingsockets:
 ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
 	mkdir -p $(BUILDDIR)
 	mkdir -p GameNetworkingSockets/build
 	cd GameNetworkingSockets && patch -p1 < ../fix-string_view-return.patch
-	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build $(GNS_FLAGS)
+	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF -DCMAKE_BUILD_TYPE=Release $(MINGW_FLAGS)
 	cmake --build GameNetworkingSockets/build
 	cd GameNetworkingSockets && patch -p1 -R < ../fix-string_view-return.patch
 	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
