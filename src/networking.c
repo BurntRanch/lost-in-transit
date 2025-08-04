@@ -649,11 +649,12 @@ static inline void TickPlayerMovement(struct Player *const player) {
         glm_vec3_add(direction, (vec3){1, 0, 0}, direction);
     }
 
-    /* use 'rotation' to decide where the directions are (if we're looking up, 'forward' should be upward) */
+    /* TODO: when players can rotate their cameras, use 'rotation' to decide where the directions are (if we're looking up, 'forward' should be upward) */
 //    static mat3 rot_matrix;
 //    glm_quat_mat3(player->rotation, rot_matrix);
 //    glm_vec3_rotate_m3(rot_matrix, direction, direction);
     glm_vec3_normalize(direction);
+    glm_vec3_mul(direction, (vec3){ 0.5, 0.5, 0.5 }, direction);
 
     glm_vec3_add(player->position, direction, player->position);
 }

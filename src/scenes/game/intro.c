@@ -7,9 +7,15 @@
 #include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_platform.h>
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_surface.h>
+#include <SDL3_image/SDL_image.h>
+#include <assert.h>
 #include <assimp/defs.h>
+#include <assimp/material.h>
 #include <assimp/mesh.h>
+#include <assimp/types.h>
 #include <assimp/vector3.h>
 #include <cglm/cam.h>
 #include <cglm/cglm.h>
@@ -21,6 +27,12 @@
 #include <stdio.h>
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
+#include <string.h>
+
+enum Shaders {
+    UNTEXTURED_TEST_SHADER,
+    TEXTURED_TEST_SHADER,
+};
 
 struct Shader {
     SDL_GPUShader *vertex;
@@ -29,6 +41,7 @@ struct Shader {
 
 struct Vertex {
     vec3 vert;
+    vec2 uv;
 };
 
 struct Buffer {
@@ -38,17 +51,29 @@ struct Buffer {
     size_t count;
 };
 
+struct Texture {
+    struct SDL_GPUSampler *gpu_sampler;
+    struct SDL_GPUTexture *gpu_texture;
+};
+
+struct Mesh {
+    /* which shader should we use to render this? */
+    enum Shaders shader;
+
+    struct Texture texture;
+
+    struct Buffer vertex_buffer;
+    struct Buffer index_buffer;
+};
+
 /* An object in the game world */
 struct Object {
     struct aiVector3D position;
     struct aiQuaternion rotation;
     struct aiVector3D scale;
 
-    struct Buffer *vertex_buffers;
-    struct Buffer *index_buffers;
-
-    /* vertex_buffers and index_buffers are the same length */
-    size_t buffers_count;
+    struct Mesh *meshes;
+    size_t mesh_count;
 };
 
 struct PlayerObjectList {
@@ -62,8 +87,10 @@ struct PlayerObjectList {
 
 static SDL_GPUDevice *gpu_device = NULL;
 
-static struct Shader test_shader;
-static SDL_GPUGraphicsPipeline *test_pipeline = NULL;
+static struct Shader untextured_test_shader;
+static struct Shader textured_test_shader;
+static SDL_GPUGraphicsPipeline *untextured_test_pipeline = NULL;
+static SDL_GPUGraphicsPipeline *textured_test_pipeline = NULL;
 
 static struct Object **objects_array = NULL;
 static Uint32 objects_count = 0;
@@ -92,7 +119,7 @@ static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t 
     return true;
 }
 
-static inline bool InitTestPipeline() {
+static inline bool InitTexturedTestPipeline() {
     static SDL_GPUShaderCreateInfo vertex_shader_create_info, fragment_shader_create_info;
 
     vertex_shader_create_info.code = NULL;
@@ -106,7 +133,7 @@ static inline bool InitTestPipeline() {
     vertex_shader_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     vertex_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/textured/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
         return false;
     }
 
@@ -114,22 +141,22 @@ static inline bool InitTestPipeline() {
     fragment_shader_create_info.code_size = sizeof(NULL);
     fragment_shader_create_info.entrypoint = "main";
     fragment_shader_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
-    fragment_shader_create_info.num_samplers = 0;
+    fragment_shader_create_info.num_samplers = 1;
     fragment_shader_create_info.num_storage_buffers = 0;
     fragment_shader_create_info.num_storage_textures = 0;
     fragment_shader_create_info.num_uniform_buffers = 0;
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/textured/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
         return false;
     }
 
-    if (!(test_shader.vertex = SDL_CreateGPUShader(gpu_device, &vertex_shader_create_info))) {
+    if (!(textured_test_shader.vertex = SDL_CreateGPUShader(gpu_device, &vertex_shader_create_info))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test vertex GPU shader! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
-    if (!(test_shader.fragment = SDL_CreateGPUShader(gpu_device, &fragment_shader_create_info))) {
+    if (!(textured_test_shader.fragment = SDL_CreateGPUShader(gpu_device, &fragment_shader_create_info))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test fragment GPU shader! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
@@ -154,15 +181,20 @@ static inline bool InitTestPipeline() {
     vertex_buffer_description.pitch = sizeof(struct Vertex);
     vertex_buffer_description.slot = 0;
 
-    struct SDL_GPUVertexAttribute vertex_attribute;
-    vertex_attribute.buffer_slot = 0;
-    vertex_attribute.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-    vertex_attribute.location = 0;
-    vertex_attribute.offset = 0;
+    struct SDL_GPUVertexAttribute vertex_attributes[2];
+    vertex_attributes[0].buffer_slot = 0;
+    vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+    vertex_attributes[0].location = 0;
+    vertex_attributes[0].offset = 0;
+    
+    vertex_attributes[1].buffer_slot = 0;
+    vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    vertex_attributes[1].location = 1;
+    vertex_attributes[1].offset = offsetof(struct Vertex, uv);
 
     struct SDL_GPUGraphicsPipelineCreateInfo graphics_pipeline_create_info;
-    graphics_pipeline_create_info.target_info.has_depth_stencil_target = false;
-    graphics_pipeline_create_info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_A8_UNORM;
+    graphics_pipeline_create_info.target_info.has_depth_stencil_target = true;
+    graphics_pipeline_create_info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
     graphics_pipeline_create_info.target_info.color_target_descriptions = &color_target_description;
     graphics_pipeline_create_info.target_info.num_color_targets = 1;
     graphics_pipeline_create_info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
@@ -175,8 +207,8 @@ static inline bool InitTestPipeline() {
     graphics_pipeline_create_info.depth_stencil_state.front_stencil_state.pass_op = SDL_GPU_STENCILOP_REPLACE;
     graphics_pipeline_create_info.depth_stencil_state.front_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
     graphics_pipeline_create_info.depth_stencil_state.enable_stencil_test = false;
-    graphics_pipeline_create_info.depth_stencil_state.enable_depth_test = false;
-    graphics_pipeline_create_info.depth_stencil_state.enable_depth_write = false;
+    graphics_pipeline_create_info.depth_stencil_state.enable_depth_test = true;
+    graphics_pipeline_create_info.depth_stencil_state.enable_depth_write = true;
     graphics_pipeline_create_info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
     graphics_pipeline_create_info.multisample_state.sample_mask = 0;
     graphics_pipeline_create_info.multisample_state.enable_mask = false;
@@ -185,24 +217,133 @@ static inline bool InitTestPipeline() {
     graphics_pipeline_create_info.rasterizer_state.enable_depth_clip = false;
     graphics_pipeline_create_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
     graphics_pipeline_create_info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
-    graphics_pipeline_create_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
-    graphics_pipeline_create_info.vertex_input_state.num_vertex_attributes = 1;
-    graphics_pipeline_create_info.vertex_input_state.vertex_attributes = &vertex_attribute;
+    graphics_pipeline_create_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    graphics_pipeline_create_info.vertex_input_state.num_vertex_attributes = 2;
+    graphics_pipeline_create_info.vertex_input_state.vertex_attributes = vertex_attributes;
     graphics_pipeline_create_info.vertex_input_state.num_vertex_buffers = 1;
     graphics_pipeline_create_info.vertex_input_state.vertex_buffer_descriptions = &vertex_buffer_description;
-    graphics_pipeline_create_info.vertex_shader = test_shader.vertex;
-    graphics_pipeline_create_info.fragment_shader = test_shader.fragment;
+    graphics_pipeline_create_info.vertex_shader = textured_test_shader.vertex;
+    graphics_pipeline_create_info.fragment_shader = textured_test_shader.fragment;
     graphics_pipeline_create_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
     graphics_pipeline_create_info.props = 0;
 
-    if (!(test_pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &graphics_pipeline_create_info))) {
+    if (!(textured_test_pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &graphics_pipeline_create_info))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test graphics pipeline! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
     return true;
 }
+static inline bool InitUntexturedTestPipeline() {
+    static SDL_GPUShaderCreateInfo vertex_shader_create_info, fragment_shader_create_info;
 
+    vertex_shader_create_info.code = NULL;
+    vertex_shader_create_info.code_size = sizeof(NULL);
+    vertex_shader_create_info.entrypoint = "main";
+    vertex_shader_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    vertex_shader_create_info.num_samplers = 0;
+    vertex_shader_create_info.num_storage_buffers = 0;
+    vertex_shader_create_info.num_storage_textures = 0;
+    vertex_shader_create_info.num_uniform_buffers = 1;
+    vertex_shader_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+    vertex_shader_create_info.props = 0;
+
+    if (!LoadShader("shaders/untextured/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
+        return false;
+    }
+
+    fragment_shader_create_info.code = NULL;
+    fragment_shader_create_info.code_size = sizeof(NULL);
+    fragment_shader_create_info.entrypoint = "main";
+    fragment_shader_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    fragment_shader_create_info.num_samplers = 0;
+    fragment_shader_create_info.num_storage_buffers = 0;
+    fragment_shader_create_info.num_storage_textures = 0;
+    fragment_shader_create_info.num_uniform_buffers = 0;
+    fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    fragment_shader_create_info.props = 0;
+
+    if (!LoadShader("shaders/untextured/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
+        return false;
+    }
+
+    if (!(untextured_test_shader.vertex = SDL_CreateGPUShader(gpu_device, &vertex_shader_create_info))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test vertex GPU shader! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+    if (!(untextured_test_shader.fragment = SDL_CreateGPUShader(gpu_device, &fragment_shader_create_info))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test fragment GPU shader! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_free((void *)vertex_shader_create_info.code);
+    SDL_free((void *)fragment_shader_create_info.code);
+
+    struct SDL_GPUColorTargetDescription color_target_description;
+    color_target_description.blend_state.enable_color_write_mask = false;
+    color_target_description.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    color_target_description.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    color_target_description.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_COLOR;
+    color_target_description.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+    color_target_description.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_DST_COLOR;
+    color_target_description.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_DST_ALPHA;
+    color_target_description.blend_state.enable_blend = false;
+    color_target_description.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+
+    struct SDL_GPUVertexBufferDescription vertex_buffer_description;
+    vertex_buffer_description.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+    vertex_buffer_description.instance_step_rate = 0;
+    vertex_buffer_description.pitch = sizeof(struct Vertex);
+    vertex_buffer_description.slot = 0;
+
+    struct SDL_GPUVertexAttribute vertex_attributes[1];
+    vertex_attributes[0].buffer_slot = 0;
+    vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+    vertex_attributes[0].location = 0;
+    vertex_attributes[0].offset = 0;
+    
+    struct SDL_GPUGraphicsPipelineCreateInfo graphics_pipeline_create_info;
+    graphics_pipeline_create_info.target_info.has_depth_stencil_target = true;
+    graphics_pipeline_create_info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+    graphics_pipeline_create_info.target_info.color_target_descriptions = &color_target_description;
+    graphics_pipeline_create_info.target_info.num_color_targets = 1;
+    graphics_pipeline_create_info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    graphics_pipeline_create_info.depth_stencil_state.back_stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
+    graphics_pipeline_create_info.depth_stencil_state.back_stencil_state.fail_op = SDL_GPU_STENCILOP_KEEP;
+    graphics_pipeline_create_info.depth_stencil_state.back_stencil_state.pass_op = SDL_GPU_STENCILOP_REPLACE;
+    graphics_pipeline_create_info.depth_stencil_state.back_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    graphics_pipeline_create_info.depth_stencil_state.front_stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
+    graphics_pipeline_create_info.depth_stencil_state.front_stencil_state.fail_op = SDL_GPU_STENCILOP_KEEP;
+    graphics_pipeline_create_info.depth_stencil_state.front_stencil_state.pass_op = SDL_GPU_STENCILOP_REPLACE;
+    graphics_pipeline_create_info.depth_stencil_state.front_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    graphics_pipeline_create_info.depth_stencil_state.enable_stencil_test = false;
+    graphics_pipeline_create_info.depth_stencil_state.enable_depth_test = true;
+    graphics_pipeline_create_info.depth_stencil_state.enable_depth_write = true;
+    graphics_pipeline_create_info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    graphics_pipeline_create_info.multisample_state.sample_mask = 0;
+    graphics_pipeline_create_info.multisample_state.enable_mask = false;
+    graphics_pipeline_create_info.rasterizer_state.depth_bias_clamp = 0.0;
+    graphics_pipeline_create_info.rasterizer_state.enable_depth_bias = true;
+    graphics_pipeline_create_info.rasterizer_state.enable_depth_clip = false;
+    graphics_pipeline_create_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    graphics_pipeline_create_info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    graphics_pipeline_create_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    graphics_pipeline_create_info.vertex_input_state.num_vertex_attributes = 1;
+    graphics_pipeline_create_info.vertex_input_state.vertex_attributes = vertex_attributes;
+    graphics_pipeline_create_info.vertex_input_state.num_vertex_buffers = 1;
+    graphics_pipeline_create_info.vertex_input_state.vertex_buffer_descriptions = &vertex_buffer_description;
+    graphics_pipeline_create_info.vertex_shader = untextured_test_shader.vertex;
+    graphics_pipeline_create_info.fragment_shader = untextured_test_shader.fragment;
+    graphics_pipeline_create_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    graphics_pipeline_create_info.props = 0;
+
+    if (!(untextured_test_pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &graphics_pipeline_create_info))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create test graphics pipeline! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    return true;
+}
 static inline bool CreateVertexBuffer(const struct Vertex *pVertices, size_t vertexCount, struct Buffer *pVertexBufferOut) {
     SDL_GPUCopyPass *copy_pass;
 
@@ -249,6 +390,8 @@ static inline bool CreateVertexBuffer(const struct Vertex *pVertices, size_t ver
     SDL_UploadToGPUBuffer(copy_pass, &src, &dst, false);
 
     SDL_EndGPUCopyPass(copy_pass);
+
+    SDL_ReleaseGPUTransferBuffer(gpu_device, transfer_buffer);
 
     pVertexBufferOut->count = vertexCount;
 
@@ -302,7 +445,61 @@ static inline bool CreateIndexBuffer(const Sint32 *pIndices, size_t indexCount, 
 
     SDL_EndGPUCopyPass(copy_pass);
 
+    SDL_ReleaseGPUTransferBuffer(gpu_device, transfer_buffer);
+
     pIndexBufferOut->count = indexCount;
+
+    return true;
+}
+
+static inline bool CopySurfaceToTexture(struct SDL_Surface *surface, struct SDL_GPUTexture *texture) {
+    static SDL_GPUCopyPass *copy_pass;
+    if (!(copy_pass = SDL_BeginGPUCopyPass(LECommandBuffer))) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to begin GPU copy pass! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    static SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
+    transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transfer_buffer_create_info.props = 0;
+    transfer_buffer_create_info.size = surface->pitch * surface->h;
+
+    static SDL_GPUTransferBuffer *transfer_buffer;
+    if (!(transfer_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info))) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create transfer buffer! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    void *transfer_buffer_data;
+    if (!(transfer_buffer_data = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, false))) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to map transfer buffer! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+    SDL_memcpy(transfer_buffer_data, surface->pixels, transfer_buffer_create_info.size);
+    SDL_UnmapGPUTransferBuffer(gpu_device, transfer_buffer);
+
+    static SDL_GPUTextureTransferInfo source_transfer_info;
+    source_transfer_info.offset = 0;
+    source_transfer_info.pixels_per_row = surface->w;
+    source_transfer_info.rows_per_layer = surface->h;
+    source_transfer_info.transfer_buffer = transfer_buffer;
+
+    static SDL_GPUTextureRegion dest_region;
+    dest_region.x = 0;
+    dest_region.y = 0;
+    dest_region.z = 0;
+    dest_region.w = surface->w;
+    dest_region.h = surface->h;
+    dest_region.d = 1;
+    dest_region.layer = 0;
+    dest_region.mip_level = 0;
+    dest_region.texture = texture;
+
+    SDL_UploadToGPUTexture(copy_pass, &source_transfer_info, &dest_region, false);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    SDL_ReleaseGPUTransferBuffer(gpu_device, transfer_buffer);
 
     return true;
 }
@@ -314,10 +511,8 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
 
     aiDecomposeMatrix(&pNode->mTransformation, &pObjectOut->scale, &pObjectOut->rotation, &pObjectOut->position);
 
-    pObjectOut->vertex_buffers = SDL_malloc(sizeof(struct Buffer *) * pNode->mNumMeshes);
-    pObjectOut->index_buffers = SDL_malloc(sizeof(struct Buffer *) * pNode->mNumMeshes);
-
-    pObjectOut->buffers_count = pNode->mNumMeshes;
+    pObjectOut->meshes = SDL_malloc(sizeof(struct Mesh) * pNode->mNumMeshes);
+    pObjectOut->mesh_count = pNode->mNumMeshes;
 
     for (mesh_idx = 0; mesh_idx < pNode->mNumMeshes; mesh_idx++) {
         mesh = pScene->mMeshes[pNode->mMeshes[mesh_idx]];
@@ -337,6 +532,9 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
             vertices[vert_idx].vert[0] = mesh->mVertices[vert_idx].x;
             vertices[vert_idx].vert[1] = mesh->mVertices[vert_idx].y;
             vertices[vert_idx].vert[2] = mesh->mVertices[vert_idx].z;
+
+            vertices[vert_idx].uv[0] = mesh->mTextureCoords[0][vert_idx].x;
+            vertices[vert_idx].uv[1] = mesh->mTextureCoords[0][vert_idx].y;
         }
 
         for (size_t face_idx = 0; face_idx < mesh->mNumFaces; face_idx++) {
@@ -362,12 +560,124 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
             SDL_memcpy(&indices[index_count - (mesh->mFaces[face_idx].mNumIndices)], mesh->mFaces[face_idx].mIndices, mesh->mFaces[face_idx].mNumIndices * sizeof(Sint32));
         }
 
-        if (!CreateVertexBuffer(vertices, mesh->mNumVertices, &pObjectOut->vertex_buffers[mesh_idx])) {
+        if (!CreateVertexBuffer(vertices, mesh->mNumVertices, &pObjectOut->meshes[mesh_idx].vertex_buffer)) {
             return false;
         }
 
-        if (!CreateIndexBuffer(indices, index_count, &pObjectOut->index_buffers[mesh_idx])) {
+        if (!CreateIndexBuffer(indices, index_count, &pObjectOut->meshes[mesh_idx].index_buffer)) {
             return false;
+        }
+
+        if (aiGetMaterialTextureCount(pScene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE) > 0) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "diffuse texture detected, using textured shader!\n");
+    
+            if (!textured_test_pipeline && !InitTexturedTestPipeline()) {
+                return false;
+            }
+
+            struct aiString path;
+            if (aiGetMaterialTexture(pScene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE, 0, &path, NULL, NULL, NULL, NULL, NULL, NULL) != aiReturn_SUCCESS) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to get material texture!\n");
+                return false;
+            }
+
+            struct SDL_Surface *texture_surface;
+            /* Embedded textures in Assimp start with an asterisk and end in an index to pScene->mTextures[] */
+            if (path.length >= 2 && path.data[0] == '*') {
+                Uint32 idx = SDL_atoi(&path.data[1]);
+
+                assert(idx < pScene->mNumTextures);
+                
+                /* some embedded textures are loaded as raw compressed data, in which case we just simply load it with SDL_image. */
+                if (pScene->mTextures[idx]->mHeight == 0) {
+                    SDL_IOStream *stream = SDL_IOFromMem(pScene->mTextures[idx]->pcData, pScene->mTextures[idx]->mWidth);
+                    if (!(texture_surface = IMG_Load_IO(stream, true))) {
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load mesh texture! (SDL Error: %s)\n", SDL_GetError());
+                        return false;
+                    }
+                } else {
+                    /* the format is static, meaning we can hardcode the pitch multiplier (4 bytes per pixel), and the format.
+                     * the lifetime of the texture pixel data also outlives the surface. which is important because this function doesn't copy the pixel data. */
+                    if (!(texture_surface = SDL_CreateSurfaceFrom(pScene->mTextures[idx]->mWidth, pScene->mTextures[idx]->mHeight, SDL_PIXELFORMAT_ARGB8888, pScene->mTextures[idx]->pcData, pScene->mTextures[idx]->mWidth * 4))) {
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load mesh texture! (SDL Error: %s)\n", SDL_GetError());
+                        return false;
+                    }
+                }
+            } else {
+                /* the `path` variable is local to the models folder, we have to prefix it with 'models/' (7 chars) */
+                char *rel_path = SDL_malloc(7 + path.length + 1);
+                strcpy(rel_path, "models/");
+                if (SDL_strcmp(SDL_GetPlatform(), "Windows") == 0) {
+                    /* oh look at me im quirky i use \ instead of / */
+                    rel_path[6] = '\\';
+                }
+                strncat(rel_path, path.data, path.length);
+                rel_path[7 + path.length] = '\0';
+
+                if (!(texture_surface = IMG_Load(rel_path))) {
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load mesh texture! (SDL Error: %s)\n", SDL_GetError());
+                    return false;
+                }
+
+                SDL_free(rel_path);
+            }
+
+            /* stupid sampler has to be a float and we can't use 'char' as a substitute */
+            struct SDL_Surface *new_surface = SDL_ConvertSurface(texture_surface, SDL_PIXELFORMAT_RGBA64_FLOAT);
+            SDL_DestroySurface(texture_surface);
+            texture_surface = new_surface;
+
+            SDL_GPUTextureCreateInfo gpu_texture_create_info;
+            gpu_texture_create_info.type = SDL_GPU_TEXTURETYPE_2D;
+            gpu_texture_create_info.props = 0;
+            gpu_texture_create_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+            gpu_texture_create_info.width = texture_surface->w;
+            gpu_texture_create_info.height = texture_surface->h;
+            gpu_texture_create_info.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+            gpu_texture_create_info.num_levels = 1;
+            gpu_texture_create_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
+            gpu_texture_create_info.layer_count_or_depth = 1;
+
+            if (!(pObjectOut->meshes[mesh_idx].texture.gpu_texture = SDL_CreateGPUTexture(gpu_device, &gpu_texture_create_info))) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
+                return false;
+            }
+
+            if (!CopySurfaceToTexture(texture_surface, pObjectOut->meshes[mesh_idx].texture.gpu_texture)) {
+                return false;
+            }
+
+            SDL_DestroySurface(texture_surface);
+
+            static SDL_GPUSamplerCreateInfo sampler_create_info;
+            sampler_create_info.props = 0;
+            sampler_create_info.enable_anisotropy = false;
+            sampler_create_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+            sampler_create_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+            sampler_create_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+            sampler_create_info.enable_compare = true;
+            sampler_create_info.mip_lod_bias = 0.0f;
+            sampler_create_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+            sampler_create_info.min_filter = SDL_GPU_FILTER_LINEAR;
+            sampler_create_info.mag_filter = SDL_GPU_FILTER_LINEAR;
+            sampler_create_info.compare_op = SDL_GPU_COMPAREOP_ALWAYS;
+            sampler_create_info.min_lod = 0.0f;
+            sampler_create_info.max_lod = 0.0f;
+
+            if (!(pObjectOut->meshes[mesh_idx].texture.gpu_sampler = SDL_CreateGPUSampler(gpu_device, &sampler_create_info))) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create GPU sampler! (SDL Error: %s)\n", SDL_GetError());
+                return false;
+            }
+
+            pObjectOut->meshes[mesh_idx].shader = TEXTURED_TEST_SHADER;
+        } else {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "diffuse texture not found, using untextured shader!\n");
+            
+            if (!untextured_test_pipeline && !InitUntexturedTestPipeline()) {
+                return false;
+            }
+
+            pObjectOut->meshes[mesh_idx].shader = UNTEXTURED_TEST_SHADER;
         }
 
         SDL_free(vertices);
@@ -576,11 +886,6 @@ static void OnPlayerUpdate(const ConnectionHandle _, const struct Player * const
     player_obj->obj->scale.x = player->scale[0];
     player_obj->obj->scale.y = player->scale[1];
     player_obj->obj->scale.z = player->scale[2];
-
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "player %d update:\n", player_obj->id);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew position: %f %f %f\n", player->position[0], player->position[1], player->position[2]);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew rotation: %f %f %f %f\n", player->rotation[0], player->rotation[1], player->rotation[2], player->rotation[3]);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tnew scale: %f %f %f\n", player->scale[0], player->scale[1], player->scale[2]);
 }
 
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
@@ -590,10 +895,6 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     glm_mat4_identity(matrices.projection);
 
     //glm_lookat(camera_pos, (vec3){0, 0, 0}, (vec3){0, 1, 0}, matrices.view);
-
-    if (!InitTestPipeline()) {
-        return false;
-    }
 
     NETSetClientDisconnectCallback(GoToMainMenu);
     NETSetClientUpdateCallback(OnPlayerUpdate);
@@ -617,29 +918,49 @@ bool IntroRender(void) {
     color_target_info.store_op = SDL_GPU_STOREOP_STORE;
     color_target_info.texture = LESwapchainTexture;
 
+    static SDL_GPUDepthStencilTargetInfo depth_stencil_target_info;
+    depth_stencil_target_info.clear_stencil = 255;
+    depth_stencil_target_info.clear_depth = 1.0f;
+    depth_stencil_target_info.cycle = false;
+    depth_stencil_target_info.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+    depth_stencil_target_info.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    depth_stencil_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+    depth_stencil_target_info.store_op = SDL_GPU_STOREOP_STORE;
+    depth_stencil_target_info.texture = LEDepthStencilTexture;
+
     static SDL_GPURenderPass *render_pass;
 
     SDL_GPUViewport viewport = {0, 0, LESwapchainWidth, LESwapchainHeight, 0.0f, 1.0f};
 
-    if (!(render_pass = SDL_BeginGPURenderPass(LECommandBuffer, &color_target_info, 1, NULL))) {
+    if (!(render_pass = SDL_BeginGPURenderPass(LECommandBuffer, &color_target_info, 1, &depth_stencil_target_info))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin render pass! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    SDL_BindGPUGraphicsPipeline(render_pass, test_pipeline);
     SDL_SetGPUViewport(render_pass, &viewport);
 
     struct Object *obj;
     for (size_t i = 0; i < objects_count; i++) {
         obj = objects_array[i];
 
-        for (size_t buf_idx = 0; buf_idx < obj->buffers_count; buf_idx++) {
+        for (size_t mesh_idx = 0; mesh_idx < obj->mesh_count; mesh_idx++) {
+            struct Mesh *mesh = &obj->meshes[mesh_idx];
+
+            switch (mesh->shader) {
+            case UNTEXTURED_TEST_SHADER:
+                SDL_BindGPUGraphicsPipeline(render_pass, untextured_test_pipeline);
+                break;
+            case TEXTURED_TEST_SHADER:
+                SDL_BindGPUGraphicsPipeline(render_pass, textured_test_pipeline);
+                break;
+            }
+
             SDL_GPUBufferBinding vertex_buffer_binding;
-            vertex_buffer_binding.buffer = obj->vertex_buffers[buf_idx].buffer;
+            vertex_buffer_binding.buffer = mesh->vertex_buffer.buffer;
             vertex_buffer_binding.offset = 0;
 
             SDL_GPUBufferBinding index_buffer_binding;
-            index_buffer_binding.buffer = obj->index_buffers[buf_idx].buffer;
+            index_buffer_binding.buffer = mesh->index_buffer.buffer;
             index_buffer_binding.offset = 0;
 
             SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_buffer_binding, 1);
@@ -653,7 +974,15 @@ bool IntroRender(void) {
 
             SDL_PushGPUVertexUniformData(LECommandBuffer, 0, &matrices, sizeof(matrices));
 
-            SDL_DrawGPUIndexedPrimitives(render_pass, obj->index_buffers[buf_idx].count, 1, 0, 0, 0);
+            if (mesh->shader == TEXTURED_TEST_SHADER) {
+                SDL_GPUTextureSamplerBinding sampler_binding;
+                sampler_binding.texture = mesh->texture.gpu_texture;
+                sampler_binding.sampler = mesh->texture.gpu_sampler;
+
+                SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
+            }
+
+            SDL_DrawGPUIndexedPrimitives(render_pass, mesh->index_buffer.count, 1, 0, 0, 0);
         }
     }
 
@@ -663,16 +992,20 @@ bool IntroRender(void) {
 }
 
 void IntroCleanup(void) {
-    /* TODO: free scene objects */
     for (; objects_count > 0; objects_count--) {
         struct Object *object = objects_array[objects_count - 1];
 
-        for (; object->buffers_count > 0; object->buffers_count--) {
-            SDL_ReleaseGPUBuffer(gpu_device, object->vertex_buffers[object->buffers_count - 1].buffer);
-            SDL_ReleaseGPUBuffer(gpu_device, object->index_buffers[object->buffers_count - 1].buffer);
+        for (; object->mesh_count > 0; object->mesh_count--) {
+            SDL_ReleaseGPUBuffer(gpu_device, object->meshes[object->mesh_count - 1].vertex_buffer.buffer);
+            SDL_ReleaseGPUBuffer(gpu_device, object->meshes[object->mesh_count - 1].index_buffer.buffer);
+
+            if (object->meshes[object->mesh_count - 1].shader == TEXTURED_TEST_SHADER) {
+                SDL_ReleaseGPUSampler(gpu_device, object->meshes[object->mesh_count - 1].texture.gpu_sampler);
+                SDL_ReleaseGPUTexture(gpu_device, object->meshes[object->mesh_count - 1].texture.gpu_texture);
+            }
         }
-        SDL_free(object->vertex_buffers);
-        SDL_free(object->index_buffers);
+
+        SDL_free(object->meshes);
 
         SDL_free(object);
     }
@@ -692,8 +1025,17 @@ void IntroCleanup(void) {
         player_objects = NULL;
     }
 
-    SDL_ReleaseGPUGraphicsPipeline(gpu_device, test_pipeline);
-
-    SDL_ReleaseGPUShader(gpu_device, test_shader.vertex);
-    SDL_ReleaseGPUShader(gpu_device, test_shader.fragment);
+    /* these objects *may* be uninitialized, which is gonna be a real pain to free. */
+    if (untextured_test_pipeline) {
+        SDL_ReleaseGPUGraphicsPipeline(gpu_device, untextured_test_pipeline);
+        SDL_ReleaseGPUShader(gpu_device, untextured_test_shader.vertex);
+        SDL_ReleaseGPUShader(gpu_device, untextured_test_shader.fragment);
+        untextured_test_pipeline = NULL;
+    }
+    if (textured_test_pipeline) {
+        SDL_ReleaseGPUGraphicsPipeline(gpu_device, textured_test_pipeline);
+        SDL_ReleaseGPUShader(gpu_device, textured_test_shader.vertex);
+        SDL_ReleaseGPUShader(gpu_device, textured_test_shader.fragment);
+        textured_test_pipeline = NULL;
+    }
 }
