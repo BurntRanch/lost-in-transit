@@ -59,8 +59,8 @@ ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
 	mkdir -p $(BUILDDIR)
 	mkdir -p GameNetworkingSockets/build
 	cd GameNetworkingSockets && patch -p1 < ../fix-string_view-return.patch
-	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF -DCMAKE_BUILD_TYPE=Release $(MINGW_FLAGS)
-	cmake --build GameNetworkingSockets/build
+	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF $(MINGW_FLAGS)
+	cmake --build GameNetworkingSockets/build --config Release
 	cd GameNetworkingSockets && patch -p1 -R < ../fix-string_view-return.patch
 	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
 endif
