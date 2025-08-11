@@ -8,8 +8,8 @@ DEBUG  	?= 1
 # WAY easier way to build debug and release builds
 ifeq ($(DEBUG), 1)
         BUILDDIR  = build/debug
-        CFLAGS := -ggdb3 -fsanitize=address,undefined -Wall -Wextra -Wpedantic -Wno-unused-parameter -DDEBUG=1 $(DEBUG_CFLAGS) $(CFLAGS)
-				LDFLAGS := -fsanitize=address,undefined
+        CFLAGS := -ggdb3 -fsanitize=undefined -Wall -Wextra -Wpedantic -Wno-unused-parameter -DDEBUG=1 $(DEBUG_CFLAGS) $(CFLAGS)
+				LDFLAGS := -fsanitize=undefined
 else
 	# Check if an optimization flag is not already set
 	ifneq ($(filter -O%,$(CFLAGS)),)
@@ -73,6 +73,6 @@ clean:
 	rm -rf $(BUILDDIR)/$(TARGET) $(OBJ)
 
 shaders:
-	for f in $(SHADERS); do $(GLSLC) $$f -o $$f.spv; done
+	for f in $(SHADERS); do $(GLSLC) -I shaders/ $$f -o $$f.spv; done
 
 .PHONY: $(TARGET) clean gamenetworkingsockets shaders all

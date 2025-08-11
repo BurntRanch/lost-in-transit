@@ -12,7 +12,9 @@
 #include <SDL3/SDL_surface.h>
 #include <SDL3_image/SDL_image.h>
 #include <assert.h>
+#include <assimp/color4.h>
 #include <assimp/defs.h>
+#include <assimp/light.h>
 #include <assimp/material.h>
 #include <assimp/mesh.h>
 #include <assimp/types.h>
@@ -42,6 +44,7 @@ struct Shader {
 struct Vertex {
     vec3 vert;
     vec2 uv;
+    vec3 norm;
 };
 
 struct Buffer {
@@ -56,11 +59,30 @@ struct Texture {
     struct SDL_GPUTexture *gpu_texture;
 };
 
+struct Light {
+    vec3 pos;
+
+    vec3 diffuse;
+    vec3 specular;
+    vec3 ambient;
+};
+
+struct Material {
+    vec3 diffuse;
+    float pad1;
+    vec3 specular;
+    float pad2;
+    vec3 ambient;
+    float pad3;
+};
+
 struct Mesh {
     /* which shader should we use to render this? */
     enum Shaders shader;
 
     struct Texture texture;
+
+    struct Material material;
 
     struct Buffer vertex_buffer;
     struct Buffer index_buffer;
@@ -105,6 +127,11 @@ alignas(16) static struct MatricesUBO {
     mat4 projection;
 } matrices;
 
+alignas(16) static struct LightsUBO {
+    struct Light lights[256];
+    int lights_count;
+} lights;
+
 /* Don't laugh */
 static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t *pSizeOut) {
     void *data = NULL;
@@ -144,7 +171,7 @@ static inline bool InitTexturedTestPipeline() {
     fragment_shader_create_info.num_samplers = 1;
     fragment_shader_create_info.num_storage_buffers = 0;
     fragment_shader_create_info.num_storage_textures = 0;
-    fragment_shader_create_info.num_uniform_buffers = 0;
+    fragment_shader_create_info.num_uniform_buffers = 2;
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
@@ -181,7 +208,7 @@ static inline bool InitTexturedTestPipeline() {
     vertex_buffer_description.pitch = sizeof(struct Vertex);
     vertex_buffer_description.slot = 0;
 
-    struct SDL_GPUVertexAttribute vertex_attributes[2];
+    struct SDL_GPUVertexAttribute vertex_attributes[3];
     vertex_attributes[0].buffer_slot = 0;
     vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attributes[0].location = 0;
@@ -191,6 +218,11 @@ static inline bool InitTexturedTestPipeline() {
     vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
     vertex_attributes[1].location = 1;
     vertex_attributes[1].offset = offsetof(struct Vertex, uv);
+
+    vertex_attributes[2].buffer_slot = 0;
+    vertex_attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+    vertex_attributes[2].location = 2;
+    vertex_attributes[2].offset = offsetof(struct Vertex, norm);
 
     struct SDL_GPUGraphicsPipelineCreateInfo graphics_pipeline_create_info;
     graphics_pipeline_create_info.target_info.has_depth_stencil_target = true;
@@ -212,13 +244,15 @@ static inline bool InitTexturedTestPipeline() {
     graphics_pipeline_create_info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
     graphics_pipeline_create_info.multisample_state.sample_mask = 0;
     graphics_pipeline_create_info.multisample_state.enable_mask = false;
-    graphics_pipeline_create_info.rasterizer_state.depth_bias_clamp = 0.0;
+    graphics_pipeline_create_info.rasterizer_state.depth_bias_clamp = 0.0f;
+    graphics_pipeline_create_info.rasterizer_state.depth_bias_constant_factor = 0.0f;
+    graphics_pipeline_create_info.rasterizer_state.depth_bias_slope_factor = 0.0f;
     graphics_pipeline_create_info.rasterizer_state.enable_depth_bias = true;
     graphics_pipeline_create_info.rasterizer_state.enable_depth_clip = false;
     graphics_pipeline_create_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
     graphics_pipeline_create_info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
     graphics_pipeline_create_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
-    graphics_pipeline_create_info.vertex_input_state.num_vertex_attributes = 2;
+    graphics_pipeline_create_info.vertex_input_state.num_vertex_attributes = 3;
     graphics_pipeline_create_info.vertex_input_state.vertex_attributes = vertex_attributes;
     graphics_pipeline_create_info.vertex_input_state.num_vertex_buffers = 1;
     graphics_pipeline_create_info.vertex_input_state.vertex_buffer_descriptions = &vertex_buffer_description;
@@ -259,7 +293,7 @@ static inline bool InitUntexturedTestPipeline() {
     fragment_shader_create_info.num_samplers = 0;
     fragment_shader_create_info.num_storage_buffers = 0;
     fragment_shader_create_info.num_storage_textures = 0;
-    fragment_shader_create_info.num_uniform_buffers = 0;
+    fragment_shader_create_info.num_uniform_buffers = 2;
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
@@ -296,11 +330,16 @@ static inline bool InitUntexturedTestPipeline() {
     vertex_buffer_description.pitch = sizeof(struct Vertex);
     vertex_buffer_description.slot = 0;
 
-    struct SDL_GPUVertexAttribute vertex_attributes[1];
+    struct SDL_GPUVertexAttribute vertex_attributes[2];
     vertex_attributes[0].buffer_slot = 0;
     vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attributes[0].location = 0;
     vertex_attributes[0].offset = 0;
+
+    vertex_attributes[1].buffer_slot = 0;
+    vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+    vertex_attributes[1].location = 2;
+    vertex_attributes[1].offset = offsetof(struct Vertex, norm);
     
     struct SDL_GPUGraphicsPipelineCreateInfo graphics_pipeline_create_info;
     graphics_pipeline_create_info.target_info.has_depth_stencil_target = true;
@@ -322,13 +361,15 @@ static inline bool InitUntexturedTestPipeline() {
     graphics_pipeline_create_info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
     graphics_pipeline_create_info.multisample_state.sample_mask = 0;
     graphics_pipeline_create_info.multisample_state.enable_mask = false;
-    graphics_pipeline_create_info.rasterizer_state.depth_bias_clamp = 0.0;
+    graphics_pipeline_create_info.rasterizer_state.depth_bias_clamp = 0.0f;
+    graphics_pipeline_create_info.rasterizer_state.depth_bias_constant_factor = 0.0f;
+    graphics_pipeline_create_info.rasterizer_state.depth_bias_slope_factor = 0.0f;
     graphics_pipeline_create_info.rasterizer_state.enable_depth_bias = true;
     graphics_pipeline_create_info.rasterizer_state.enable_depth_clip = false;
     graphics_pipeline_create_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
     graphics_pipeline_create_info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
     graphics_pipeline_create_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
-    graphics_pipeline_create_info.vertex_input_state.num_vertex_attributes = 1;
+    graphics_pipeline_create_info.vertex_input_state.num_vertex_attributes = 2;
     graphics_pipeline_create_info.vertex_input_state.vertex_attributes = vertex_attributes;
     graphics_pipeline_create_info.vertex_input_state.num_vertex_buffers = 1;
     graphics_pipeline_create_info.vertex_input_state.vertex_buffer_descriptions = &vertex_buffer_description;
@@ -535,6 +576,10 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
 
             vertices[vert_idx].uv[0] = mesh->mTextureCoords[0][vert_idx].x;
             vertices[vert_idx].uv[1] = mesh->mTextureCoords[0][vert_idx].y;
+
+            vertices[vert_idx].norm[0] = mesh->mNormals[vert_idx].x;
+            vertices[vert_idx].norm[1] = mesh->mNormals[vert_idx].y;
+            vertices[vert_idx].norm[2] = mesh->mNormals[vert_idx].z;
         }
 
         for (size_t face_idx = 0; face_idx < mesh->mNumFaces; face_idx++) {
@@ -567,6 +612,27 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
         if (!CreateIndexBuffer(indices, index_count, &pObjectOut->meshes[mesh_idx].index_buffer)) {
             return false;
         }
+
+        static struct aiColor4D diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+        static struct aiColor4D specular = { 1.0f, 1.0f, 1.0f, 1.0f };
+        static struct aiColor4D ambient = { 0.2f, 0.2f, 0.2f, 1.0f };
+
+        aiGetMaterialColor(pScene->mMaterials[mesh->mMaterialIndex], AI_MATKEY_COLOR_DIFFUSE, &diffuse);
+        aiGetMaterialColor(pScene->mMaterials[mesh->mMaterialIndex], AI_MATKEY_COLOR_SPECULAR, &specular);
+        aiGetMaterialColor(pScene->mMaterials[mesh->mMaterialIndex], AI_MATKEY_COLOR_AMBIENT, &ambient);
+
+        /* discard .a */
+        pObjectOut->meshes[mesh_idx].material.diffuse[0] = diffuse.r;
+        pObjectOut->meshes[mesh_idx].material.diffuse[1] = diffuse.g;
+        pObjectOut->meshes[mesh_idx].material.diffuse[2] = diffuse.b;
+
+        pObjectOut->meshes[mesh_idx].material.specular[0] = specular.r;
+        pObjectOut->meshes[mesh_idx].material.specular[1] = specular.g;
+        pObjectOut->meshes[mesh_idx].material.specular[2] = specular.b;
+
+        pObjectOut->meshes[mesh_idx].material.ambient[0] = ambient.r;
+        pObjectOut->meshes[mesh_idx].material.ambient[1] = ambient.g;
+        pObjectOut->meshes[mesh_idx].material.ambient[2] = ambient.b;
 
         if (aiGetMaterialTextureCount(pScene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE) > 0) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "diffuse texture detected, using textured shader!\n");
@@ -777,6 +843,33 @@ static inline bool LoadScene() {
         return false;
     }
 
+    for (size_t i = 0; i < scene->mNumLights; i++) {
+        static struct aiLight *light;
+        light = scene->mLights[i];
+        static const struct aiNode *corresponding_node;
+        corresponding_node = GetNodeByName(scene->mRootNode, light->mName.data, light->mName.length);
+ 
+        static struct aiVector3D position;
+        aiDecomposeMatrix(&corresponding_node->mTransformation, NULL, NULL, &position);
+        aiVector3Add(&position, &light->mPosition);
+        
+        lights.lights[lights.lights_count].pos[0] = position.x;
+        lights.lights[lights.lights_count].pos[1] = position.y;
+        lights.lights[lights.lights_count].pos[2] = position.z;
+
+        lights.lights[lights.lights_count].diffuse[0] = light->mColorDiffuse.r;
+        lights.lights[lights.lights_count].diffuse[1] = light->mColorDiffuse.g;
+        lights.lights[lights.lights_count].diffuse[2] = light->mColorDiffuse.b;
+
+        lights.lights[lights.lights_count].specular[0] = light->mColorSpecular.r;
+        lights.lights[lights.lights_count].specular[1] = light->mColorSpecular.g;
+        lights.lights[lights.lights_count].specular[2] = light->mColorSpecular.b;
+
+        lights.lights[lights.lights_count].ambient[0] = light->mColorAmbient.r;
+        lights.lights[lights.lights_count].ambient[1] = light->mColorAmbient.g;
+        lights.lights[lights.lights_count++].ambient[2] = light->mColorAmbient.b;
+    }
+
     aiReleaseImport(scene);
 
     const struct aiScene *character_scene = aiImportFile("models/character.glb", 0);
@@ -891,6 +984,8 @@ static void OnPlayerUpdate(const ConnectionHandle _, const struct Player * const
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     gpu_device = pGPUDevice;
 
+    lights.lights_count = 0;
+
     glm_mat4_identity(matrices.view);
     glm_mat4_identity(matrices.projection);
 
@@ -973,6 +1068,9 @@ bool IntroRender(void) {
             glm_scale(matrices.model, (vec3){ obj->scale.x, obj->scale.y, obj->scale.z });
 
             SDL_PushGPUVertexUniformData(LECommandBuffer, 0, &matrices, sizeof(matrices));
+
+            SDL_PushGPUFragmentUniformData(LECommandBuffer, 0, &mesh->material, sizeof(mesh->material));
+            SDL_PushGPUFragmentUniformData(LECommandBuffer, 1, &lights, sizeof(lights));
 
             if (mesh->shader == TEXTURED_TEST_SHADER) {
                 SDL_GPUTextureSamplerBinding sampler_binding;

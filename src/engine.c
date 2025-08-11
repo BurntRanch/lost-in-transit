@@ -116,7 +116,7 @@ static bool InitGPURenderTexture() {
         return false;
     }
 
-    if (!(render_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, LESwapchainWidth, LESwapchainHeight))) {
+    if (!(render_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, LESwapchainWidth, LESwapchainHeight))) {
         SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Failed to create render_texture! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
@@ -179,11 +179,7 @@ bool LEInitWindow(void) {
     SDL_SetWindowMinimumSize(window, 400, 300);
 
     /* We have to call this stupid function, oh well */
-    if (!SDL_GetWindowSurface(window)) {
-        SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Something went wrong while getting a surface! (SDL Error: %s)\n", SDL_GetError());
-        return false;
-    }
-    if (!(renderer = SDL_GetRenderer(window))) {
+    if (!(renderer = SDL_CreateRenderer(window, "vulkan"))) {
         SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting the renderer! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
