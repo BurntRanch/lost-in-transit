@@ -28,6 +28,5 @@ void main() {
         result += (lights.lights[i].ambient * (1.0 / lights.lights_count));
     }
 
-    // BGRA
-    outColor = vec4(result.bgr, 1.0);
+    outColor = vec4(result, 1.0);
 }

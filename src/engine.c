@@ -116,7 +116,8 @@ static bool InitGPURenderTexture() {
         return false;
     }
 
-    if (!(render_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, LESwapchainWidth, LESwapchainHeight))) {
+    /* the colors are reversed so this is effectively RGBA. Please don't ask me anything about this. */
+    if (!(render_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, LESwapchainWidth, LESwapchainHeight))) {
         SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Failed to create render_texture! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
