@@ -29,9 +29,9 @@ OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
 LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
-LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lassimp -lcglm -lstdc++
+LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lz -lassimp -lcglm -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
-CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
+CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	 = $(CFLAGS)
 
 SHADER_DIR 	 = shaders
@@ -52,7 +52,7 @@ else
       -G "Ninja"
 endif
 
-all: gamenetworkingsockets shaders $(TARGET)
+all: gamenetworkingsockets assimp shaders $(TARGET)
 
 gamenetworkingsockets:
 ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
@@ -65,7 +65,14 @@ ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
 	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
 endif
 
-$(TARGET): shaders gamenetworkingsockets $(OBJ)
+assimp:
+ifeq ($(wildcard $(BUILDDIR)/libassimp.a),)
+	mkdir -p $(BUILDDIR)
+	cd external/assimp && cmake CMakeLists.txt -G Ninja -DASSIMP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF && cmake --build .
+	cp external/assimp/lib/libassimp.a $(BUILDDIR)
+endif
+
+$(TARGET): shaders assimp gamenetworkingsockets $(OBJ)
 	mkdir -p $(BUILDDIR)
 	$(CC) $(OBJ) -o $(BUILDDIR)/$(TARGET) $(LDFLAGS) $(LDLIBS)
 
@@ -75,4 +82,4 @@ clean:
 shaders:
 	for f in $(SHADERS); do $(GLSLC) -I shaders/ $$f -o $$f.spv; done
 
-.PHONY: $(TARGET) clean gamenetworkingsockets shaders all
+.PHONY: $(TARGET) clean gamenetworkingsockets assimp shaders all

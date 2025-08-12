@@ -1,4 +1,5 @@
 -I./include
+-I./external/assimp/include
 -I/usr/local/include/GameNetworkingSockets
 -Wall
 -Wextra

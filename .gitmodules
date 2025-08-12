@@ -1,3 +1,6 @@
 [submodule "GameNetworkingSockets"]
 	path = GameNetworkingSockets
 	url = https://github.com/ValveSoftware/GameNetworkingSockets
+[submodule "external/assimp"]
+	path = external/assimp
+	url = https://github.com/assimp/assimp
