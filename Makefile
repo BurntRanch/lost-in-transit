@@ -1,6 +1,8 @@
 CC      ?= gcc
 CXX	?= g++
 GLSLC	?= glslc
+CSTD	?= c23
+CXXSTD  ?= c++20
 
 UNAME_S := $(shell uname -s)
 DEBUG  	?= 1
@@ -8,8 +10,7 @@ DEBUG  	?= 1
 # WAY easier way to build debug and release builds
 ifeq ($(DEBUG), 1)
         BUILDDIR  = build/debug
-        CFLAGS := -ggdb3 -fsanitize=undefined -Wall -Wextra -Wpedantic -Wno-unused-parameter -DDEBUG=1 $(DEBUG_CFLAGS) $(CFLAGS)
-				LDFLAGS := -fsanitize=undefined
+        CFLAGS := -ggdb3 -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-newline-eof -DDEBUG=1 $(DEBUG_CFLAGS) $(CFLAGS)
 else
 	# Check if an optimization flag is not already set
 	ifneq ($(filter -O%,$(CFLAGS)),)
@@ -28,38 +29,50 @@ SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
-LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
-LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lz -lassimp -lcglm -lstdc++
-CFLAGS  	?= -mtune=generic -march=native
-CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
-CXXFLAGS	 = $(CFLAGS)
+LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image)
+LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lGameNetworkingSockets -lz -lminizip -lcglm -lstdc++
+CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DVERSION=\"$(VERSION)\"
+CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD)
+CFLAGS		+= -std=$(CSTD)
 
 SHADER_DIR 	 = shaders
 SHADERS 	 = $(wildcard $(SHADER_DIR)/untextured/*.vert $(SHADER_DIR)/untextured/*.frag $(SHADER_DIR)/textured/*.vert $(SHADER_DIR)/textured/*.frag)
 SPV 		 = $(SHADERS:.vert=.vert.spv)
 SPV 		:= $(SPV:.frag=.frag.spv)
 
-# is macos?
+# This is an hacky ugly bastard way to check if we're not in windows
+# just to add UBSAN
 ifeq ($(UNAME_S),Darwin)
     LIBNAME     := dylib
-else ifeq ($(UNAME_S),Linux)
+    LDFLAGS	+= -L/usr/local/lib -Wl,-rpath,/usr/local/lib
+    ifeq ($(DEBUG), 1)
+    	CFLAGS	 += -fsanitize=undefined
+        CXXFLAGS += -fsanitize=undefined
+    	LDFLAGS  += -fsanitize=undefined
+    endif
+endif
+ifeq ($(UNAME_S),Linux)
     LIBNAME     := so
-else
+    ifeq ($(DEBUG), 1)
+        CFLAGS   += -fsanitize=undefined
+        CXXFLAGS += -fsanitize=undefined
+        LDFLAGS  += -fsanitize=undefined
+    endif
+else ifneq ($(UNAME_S),Darwin)
     LIBNAME     := dll
-    MINGW_FLAGS := -DCMAKE_SYSTEM_NAME=Windows \
-      -DProtobuf_PROTOC_EXECUTABLE=/mingw64/bin/protoc.exe \
-      -DOPENSSL_USE_STATIC_LIBS=ON \
-      -G "Ninja"
+    MINGW_FLAGS := -DOPENSSL_ROOT_DIR=/mingw64 \
+  -DOPENSSL_INCLUDE_DIR=/mingw64/include \
+  -DOPENSSL_CRYPTO_LIBRARY=/mingw64/lib/libcrypto.dll.a \
+  -DOPENSSL_SSL_LIBRARY=/mingw64/lib/libssl.dll.a
 endif
 
 all: gamenetworkingsockets assimp shaders $(TARGET)
 
 gamenetworkingsockets:
 ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
-	mkdir -p $(BUILDDIR)
-	mkdir -p GameNetworkingSockets/build
+	mkdir -p $(BUILDDIR) GameNetworkingSockets/build GameNetworkingSockets/build/src
 	cd GameNetworkingSockets && patch -p1 < ../fix-string_view-return.patch
-	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF $(MINGW_FLAGS)
+	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF -DBUILD_TESTS=OFF $(MINGW_FLAGS)
 	cmake --build GameNetworkingSockets/build --config Release
 	cd GameNetworkingSockets && patch -p1 -R < ../fix-string_view-return.patch
 	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
@@ -67,9 +80,13 @@ endif
 
 assimp:
 ifeq ($(wildcard $(BUILDDIR)/libassimp.a),)
-	mkdir -p $(BUILDDIR)
-	cd external/assimp && cmake CMakeLists.txt -G Ninja -DASSIMP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF && cmake --build .
-	cp external/assimp/lib/libassimp.a $(BUILDDIR)
+	mkdir -p $(BUILDDIR) external/assimp/build
+	cd external/assimp && patch -p1 < ../../fix-assimp-6144.patch
+	cmake -S external/assimp -B external/assimp/build -DASSIMP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF
+	cmake --build external/assimp/build
+	cd external/assimp && patch -p1 -R < ../../fix-assimp-6144.patch
+	cp external/assimp/build/lib/libassimp.a $(BUILDDIR)
+	cp external/assimp/build/include/assimp/config.h external/assimp/build/include/assimp/revision.h external/assimp/include/assimp/
 endif
 
 $(TARGET): shaders assimp gamenetworkingsockets $(OBJ)

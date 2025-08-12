@@ -20,3 +20,16 @@ index 50dba23..89a58b4 100644
  		} \
  	}
  
+diff --git a/src/public/tier0/valve_tracelogging.h b/src/public/tier0/valve_tracelogging.h
+index bf1d5d9..1e3ff4a 100644
+--- a/src/public/tier0/valve_tracelogging.h
++++ b/src/public/tier0/valve_tracelogging.h
+@@ -67,7 +67,7 @@
+ 
+ #include "platform.h"
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && defined(_MSC_VER)
+ 
+ 	// NOTE - for compile consistency, we always include the windows headers, even if tracelogging is not enabled
+ 

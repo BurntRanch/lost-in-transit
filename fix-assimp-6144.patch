@@ -1,0 +1,12 @@
+diff --git a/code/AssetLib/X3D/X3DGeoHelper.cpp b/code/AssetLib/X3D/X3DGeoHelper.cpp
+index 1c962a460..93d1f1b70 100644
+--- a/code/AssetLib/X3D/X3DGeoHelper.cpp
++++ b/code/AssetLib/X3D/X3DGeoHelper.cpp
+@@ -189,6 +189,7 @@ mg_m_err:
+ }
+ 
+ void X3DGeoHelper::coordIdx_str2lines_arr(const std::vector<int32_t> &pCoordIdx, std::vector<aiFace> &pFaces) {
++    if (pCoordIdx.empty()) return;
+     std::vector<int32_t> f_data(pCoordIdx);
+ 
+     if (f_data.back() != (-1)) {
