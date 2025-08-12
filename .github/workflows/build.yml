@@ -61,4 +61,4 @@ jobs:
       - name: Build project (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          make all CXX=/opt/homebrew/opt/llvm/bin/clang++ CC=/opt/homebrew/opt/llvm/bin/clang
+          make all CXX=/opt/homebrew/opt/llvm/bin/clang++ CC=/opt/homebrew/opt/llvm/bin/clang VARS=-I/opt/homebrew/opt/sdl3/include
