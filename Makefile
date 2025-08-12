@@ -30,7 +30,7 @@ OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
 LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
 LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lz -lminizip -lassimp -lcglm -lstdc++
-CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3) -DVERSION=\"$(VERSION)\"
+CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3_ttf sdl3_image) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	 = $(CFLAGS)
 
 SHADER_DIR 	 = shaders

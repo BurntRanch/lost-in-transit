@@ -40,7 +40,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           brew update
-          brew install cmake make ninja sdl3 git protobuf glslang shaderc llvm
+          brew install cmake make ninja sdl3 sdl3_ttf sdl3_image git protobuf glslang shaderc llvm
 
       - name: Build and install cglm (Linux/macOS)
         run: |
