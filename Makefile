@@ -42,14 +42,8 @@ SPV 		:= $(SPV:.frag=.frag.spv)
 # is macos?
 ifeq ($(UNAME_S),Darwin)
     LIBNAME     := dylib
-else ifeq ($(UNAME_S),Linux)
-    LIBNAME     := so
 else
-    LIBNAME     := dll
-    MINGW_FLAGS := -DCMAKE_SYSTEM_NAME=Windows \
-      -DProtobuf_PROTOC_EXECUTABLE=/mingw64/bin/protoc.exe \
-      -DOPENSSL_USE_STATIC_LIBS=ON \
-      -G "Ninja"
+    LIBNAME     := so
 endif
 
 all: gamenetworkingsockets assimp shaders $(TARGET)
@@ -58,8 +52,9 @@ gamenetworkingsockets:
 ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
 	mkdir -p $(BUILDDIR)
 	mkdir -p GameNetworkingSockets/build
+	mkdir -p GameNetworkingSockets/build/src
 	cd GameNetworkingSockets && patch -p1 < ../fix-string_view-return.patch
-	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF $(MINGW_FLAGS)
+	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF
 	cmake --build GameNetworkingSockets/build --config Release
 	cd GameNetworkingSockets && patch -p1 -R < ../fix-string_view-return.patch
 	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
@@ -69,7 +64,7 @@ assimp:
 ifeq ($(wildcard $(BUILDDIR)/libassimp.a),)
 	mkdir -p $(BUILDDIR)
 	mkdir -p external/assimp/build
-	cmake -S external/assimp -B build -G Ninja -DASSIMP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF
+	cmake -S external/assimp -B external/assimp/build -DASSIMP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF
 	cmake --build external/assimp/build
 	cp external/assimp/build/lib/libassimp.a $(BUILDDIR)
 endif
