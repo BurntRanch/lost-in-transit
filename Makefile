@@ -29,7 +29,7 @@ OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
 LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR)
-LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lz -lassimp -lcglm -lstdc++
+LDLIBS		+= -lm -lSDL3 -lSDL3_ttf -lSDL3_image -lGameNetworkingSockets -lz -lminizip -lassimp -lcglm -lstdc++
 CFLAGS  	?= -mtune=generic -march=native
 CFLAGS		+= -fvisibility=hidden -std=c23 -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) -DVERSION=\"$(VERSION)\"
 CXXFLAGS	 = $(CFLAGS)
@@ -68,8 +68,10 @@ endif
 assimp:
 ifeq ($(wildcard $(BUILDDIR)/libassimp.a),)
 	mkdir -p $(BUILDDIR)
-	cd external/assimp && cmake CMakeLists.txt -G Ninja -DASSIMP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF && cmake --build .
-	cp external/assimp/lib/libassimp.a $(BUILDDIR)
+	mkdir -p external/assimp/build
+	cmake -S external/assimp -B build -G Ninja -DASSIMP_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF
+	cmake --build external/assimp/build
+	cp external/assimp/build/lib/libassimp.a $(BUILDDIR)
 endif
 
 $(TARGET): shaders assimp gamenetworkingsockets $(OBJ)
