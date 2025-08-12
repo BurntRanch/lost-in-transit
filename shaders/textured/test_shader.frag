@@ -1,6 +1,8 @@
 #version 450
 
 layout(location = 0) in vec2 uv;
+layout(location = 1) in vec3 FragPos;
+layout(location = 2) in vec3 Normal;
 
 layout(set = 2, binding = 0) uniform sampler2D tex;
 
@@ -16,23 +18,39 @@ layout(std140, set = 3, binding = 0) uniform material {
     vec3 diffuse;
     vec3 specular;
     vec3 ambient;
+
+    float shininess;
 } mat;
 
 layout(std140, set = 3, binding = 1) uniform lights_array {
-    Light lights[256];
     int lights_count;
+    Light lights[256];
 } lights;
+
+layout(std140, set = 3, binding = 2) uniform camera_info {
+    vec3 pos;
+} camera;
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    vec3 result = mat.ambient;
+    vec3 result = vec3(0);
+
+    vec3 norm = normalize(Normal);
 
     for (int i = 0; i < lights.lights_count; i++) {
-        result += (lights.lights[i].ambient * (1.0 / lights.lights_count));
+        Light light = lights.lights[i];
+
+        vec3 viewDir = normalize(camera.pos - FragPos);
+        vec3 lightDir = normalize(light.pos - FragPos);
+        vec3 reflectDir = reflect(-lightDir, norm);
+
+        float diff = max(dot(norm, lightDir), 0.0);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), mat.shininess);
+
+        result += (light.ambient * mat.ambient) + (diff * light.diffuse * mat.diffuse) + (spec * light.specular * mat.specular) * (1.0 / lights.lights_count);
     }
 
-    result *= texture(tex, uv).xyz;
-
+    result *= max(texture(tex, uv).xyz, mat.ambient);
     outColor = vec4(result, 1.0);
 }

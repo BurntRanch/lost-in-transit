@@ -11,9 +11,12 @@ layout(std140, set = 1, binding = 0) uniform matrices {
 } mats;
 
 layout(location = 0) out vec2 uv;
+layout(location = 1) out vec3 FragPos;
+layout(location = 2) out vec3 Normal;
 
 void main() {
-    uv = vert_uv;
-
     gl_Position = mats.projection * mats.view * mats.model * vec4(vert_pos, 1.0);
+    uv = vert_uv;
+    FragPos = vec3(mats.model * vec4(vert_pos, 1.0));
+    Normal = vert_norm;
 }

@@ -61,10 +61,16 @@ struct Texture {
 
 struct Light {
     vec3 pos;
+    float pad1;
 
     vec3 diffuse;
+    float pad2;
+    
     vec3 specular;
+    float pad3;
+
     vec3 ambient;
+    float pad4;
 };
 
 struct Material {
@@ -73,7 +79,8 @@ struct Material {
     vec3 specular;
     float pad2;
     vec3 ambient;
-    float pad3;
+
+    float shininess;
 };
 
 struct Mesh {
@@ -127,9 +134,11 @@ alignas(16) static struct MatricesUBO {
     mat4 projection;
 } matrices;
 
-alignas(16) static struct LightsUBO {
-    struct Light lights[256];
-    int lights_count;
+static struct LightsUBO {
+    int lights_count; // 4 bytes
+    char pad1[12];  // 12 + 4 bytes
+
+    struct Light lights[256]; // starts at 16 bytes
 } lights;
 
 /* Don't laugh */
@@ -171,7 +180,7 @@ static inline bool InitTexturedTestPipeline() {
     fragment_shader_create_info.num_samplers = 1;
     fragment_shader_create_info.num_storage_buffers = 0;
     fragment_shader_create_info.num_storage_textures = 0;
-    fragment_shader_create_info.num_uniform_buffers = 2;
+    fragment_shader_create_info.num_uniform_buffers = 3;
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
@@ -293,7 +302,7 @@ static inline bool InitUntexturedTestPipeline() {
     fragment_shader_create_info.num_samplers = 0;
     fragment_shader_create_info.num_storage_buffers = 0;
     fragment_shader_create_info.num_storage_textures = 0;
-    fragment_shader_create_info.num_uniform_buffers = 2;
+    fragment_shader_create_info.num_uniform_buffers = 3;
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
@@ -634,6 +643,12 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
         pObjectOut->meshes[mesh_idx].material.ambient[1] = ambient.g;
         pObjectOut->meshes[mesh_idx].material.ambient[2] = ambient.b;
 
+        pObjectOut->meshes[mesh_idx].material.shininess = 0;
+        aiGetMaterialFloat(pScene->mMaterials[mesh->mMaterialIndex], AI_MATKEY_SHININESS, &pObjectOut->meshes[mesh_idx].material.shininess);
+        if (pObjectOut->meshes[mesh_idx].material.shininess == 0) {
+            pObjectOut->meshes[mesh_idx].material.shininess = 32;
+        }
+
         if (aiGetMaterialTextureCount(pScene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE) > 0) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "diffuse texture detected, using textured shader!\n");
     
@@ -850,24 +865,35 @@ static inline bool LoadScene() {
         corresponding_node = GetNodeByName(scene->mRootNode, light->mName.data, light->mName.length);
  
         static struct aiVector3D position;
-        aiDecomposeMatrix(&corresponding_node->mTransformation, NULL, NULL, &position);
+        static struct aiQuaternion _;
+        static struct aiVector3D _1;
+        aiDecomposeMatrix(&corresponding_node->mTransformation, &_1, &_, &position);
         aiVector3Add(&position, &light->mPosition);
-        
+
+        /* TODO: temporary, maybe there's a better solution.
+         * Doing this to avoid stupid high diffuse values. */
+        struct aiVector3D diffuse = {light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b};
+        struct aiVector3D specular = {light->mColorSpecular.r, light->mColorSpecular.g, light->mColorSpecular.b};
+        struct aiVector3D ambient = {light->mColorAmbient.r, light->mColorAmbient.g, light->mColorAmbient.b};
+        aiVector3DivideByScalar(&diffuse, SDL_max(SDL_max(SDL_max(light->mColorDiffuse.r, light->mColorDiffuse.g), light->mColorDiffuse.b), 1.0));
+        aiVector3DivideByScalar(&specular, SDL_max(SDL_max(SDL_max(light->mColorSpecular.r, light->mColorSpecular.g), light->mColorSpecular.b), 1.0));
+        aiVector3DivideByScalar(&ambient, SDL_max(SDL_max(SDL_max(light->mColorAmbient.r, light->mColorAmbient.g), light->mColorAmbient.b), 1.0));
+
         lights.lights[lights.lights_count].pos[0] = position.x;
         lights.lights[lights.lights_count].pos[1] = position.y;
         lights.lights[lights.lights_count].pos[2] = position.z;
 
-        lights.lights[lights.lights_count].diffuse[0] = light->mColorDiffuse.r;
-        lights.lights[lights.lights_count].diffuse[1] = light->mColorDiffuse.g;
-        lights.lights[lights.lights_count].diffuse[2] = light->mColorDiffuse.b;
+        lights.lights[lights.lights_count].diffuse[0] = diffuse.x;
+        lights.lights[lights.lights_count].diffuse[1] = diffuse.y;
+        lights.lights[lights.lights_count].diffuse[2] = diffuse.z;
 
-        lights.lights[lights.lights_count].specular[0] = light->mColorSpecular.r;
-        lights.lights[lights.lights_count].specular[1] = light->mColorSpecular.g;
-        lights.lights[lights.lights_count].specular[2] = light->mColorSpecular.b;
-
-        lights.lights[lights.lights_count].ambient[0] = light->mColorAmbient.r;
-        lights.lights[lights.lights_count].ambient[1] = light->mColorAmbient.g;
-        lights.lights[lights.lights_count++].ambient[2] = light->mColorAmbient.b;
+        lights.lights[lights.lights_count].specular[0] = specular.x;
+        lights.lights[lights.lights_count].specular[1] = specular.y;
+        lights.lights[lights.lights_count].specular[2] = specular.z;
+        
+        lights.lights[lights.lights_count].ambient[0] = ambient.x;
+        lights.lights[lights.lights_count].ambient[1] = ambient.y;
+        lights.lights[lights.lights_count++].ambient[2] = ambient.z;
     }
 
     aiReleaseImport(scene);
@@ -1003,7 +1029,7 @@ bool IntroRender(void) {
         return false;
     }
 
-    glm_perspective(1.5708f, (float)LESwapchainWidth/(float)LESwapchainHeight, 0.1f, 1000.f, matrices.projection);
+    glm_perspective(1.0472f, (float)LESwapchainWidth/(float)LESwapchainHeight, 0.1f, 1000.f, matrices.projection);
     glm_look(camera_pos, (vec3){-1, 0, 0}, (vec3){0, 1, 0}, matrices.view);
 
     static SDL_GPUColorTargetInfo color_target_info;
@@ -1071,6 +1097,7 @@ bool IntroRender(void) {
 
             SDL_PushGPUFragmentUniformData(LECommandBuffer, 0, &mesh->material, sizeof(mesh->material));
             SDL_PushGPUFragmentUniformData(LECommandBuffer, 1, &lights, sizeof(lights));
+            SDL_PushGPUFragmentUniformData(LECommandBuffer, 2, &camera_pos, sizeof(camera_pos));
 
             if (mesh->shader == TEXTURED_TEST_SHADER) {
                 SDL_GPUTextureSamplerBinding sampler_binding;
