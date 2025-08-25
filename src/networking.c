@@ -571,7 +571,7 @@ void NETHandleData(const enum Role role, const ConnectionHandle handle, const vo
 }
 
 enum MovementDirection NETGetDirection() {
-    return client_self ? client_self->active_direction : MOVEMENT_COMPLETELY_STILL;
+    return client_self ? client_wanted_direction : MOVEMENT_COMPLETELY_STILL;
 }
 
 void NETChangeMovement(enum MovementDirection direction) {
@@ -691,7 +691,7 @@ void NETTickClient() {
         return;
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Updating movement!\n");
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Updating movement! (%d => %d)\n", client_self->active_direction, client_wanted_direction);
 
     static struct MovementUpdatePacket packet = {PACKET_TYPE_MOVEMENT_UPDATE, MOVEMENT_COMPLETELY_STILL};
     packet.direction = client_wanted_direction;

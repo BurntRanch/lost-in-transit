@@ -103,7 +103,7 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle);
 /* Called by steam.cc */
 void NETHandleData(const enum Role role, const ConnectionHandle handle, const void *const data, const Uint32 size);
 
-/* Get the direction we're going at. completely still may be returned IF we aren't even connected */
+/* Get the direction we **want** to go at. not server-authoritative. use NETGetPlayerByID and NETGetSelfID to get the server-authoritative direction. */
 enum MovementDirection NETGetDirection();
 
 /* Ask the server to change our movement direction. */
