@@ -1,7 +1,11 @@
 #include "scenes/game/intro.h"
+#include "assimp/anim.h"
+#include "assimp/matrix4x4.h"
+#include "assimp/quaternion.h"
 #include "engine.h"
 #include "networking.h"
 #include "scenes.h"
+#include <SDL3/SDL_assert.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_iostream.h>
@@ -22,6 +26,7 @@
 #include <cglm/cam.h>
 #include <cglm/cglm.h>
 #include <cglm/affine.h>
+#include <cglm/mat4.h>
 #include <cglm/quat.h>
 #include <cglm/types.h>
 #include <stdalign.h>
@@ -45,6 +50,10 @@ struct Vertex {
     vec3 vert;
     vec2 uv;
     vec3 norm;
+
+    /* these should be seen as lists. only up to 4 bones can influence a single vertex. */
+    ivec4 bone_ids;
+    vec4 weights;
 };
 
 struct Buffer {
@@ -95,6 +104,36 @@ struct Mesh {
     struct Buffer index_buffer;
 };
 
+struct Vec3Keyframe {
+    struct aiVector3D value;
+    double timestamp;
+};
+
+struct QuatKeyframe {
+    struct aiQuaternion value;
+    double timestamp;
+};
+
+struct Bone {
+    char *name;
+
+    struct Vec3Keyframe *position_keys;
+    size_t position_key_count;
+
+    struct QuatKeyframe *rotation_keys;
+    size_t rotation_key_count;
+
+    struct Vec3Keyframe *scale_keys;
+    size_t scale_key_count;
+
+    mat4 local_transform;
+};
+
+struct Scene {
+    struct Bone bones[100];
+    size_t bone_count;
+};
+
 /* An object in the game world */
 struct Object {
     struct aiVector3D position;
@@ -103,6 +142,9 @@ struct Object {
 
     struct Mesh *meshes;
     size_t mesh_count;
+
+    struct Scene *scene;
+    struct Object *parent;
 };
 
 struct PlayerObjectList {
@@ -132,6 +174,7 @@ alignas(16) static struct MatricesUBO {
     mat4 model;
     mat4 view;
     mat4 projection;
+    mat4 bone_matrices[100];
 } matrices;
 
 static struct LightsUBO {
@@ -554,8 +597,19 @@ static inline bool CopySurfaceToTexture(struct SDL_Surface *surface, struct SDL_
     return true;
 }
 
+/* returns index to scene->bones, returns -1 on fail (wraps around to size_t max) */
+static inline size_t FindBoneByName(const struct Scene *scene, const char *name) {
+    for (size_t bone_idx = 0; bone_idx < scene->bone_count; bone_idx++) {
+        if (SDL_strcmp(scene->bones[bone_idx].name, name) == 0) {
+            return bone_idx;
+        }
+    }
+
+    return -1;
+}
+
 /* Create an Object out of an aiNode */
-static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode *pNode, struct Object *pObjectOut) {
+static inline bool LoadObject(const struct aiScene *pScene, struct Scene *scene, const struct aiNode *pNode, struct Object *pObjectOut, struct Object *pParent) {
     static size_t mesh_idx;
     static struct aiMesh *mesh;
 
@@ -589,6 +643,33 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
             vertices[vert_idx].norm[0] = mesh->mNormals[vert_idx].x;
             vertices[vert_idx].norm[1] = mesh->mNormals[vert_idx].y;
             vertices[vert_idx].norm[2] = mesh->mNormals[vert_idx].z;
+
+            vertices[vert_idx].bone_ids[0] = -1;
+            vertices[vert_idx].bone_ids[1] = -1;
+            vertices[vert_idx].bone_ids[2] = -1;
+            vertices[vert_idx].bone_ids[3] = -1;
+        }
+
+        for (size_t bone_idx = 0; bone_idx < mesh->mNumBones; bone_idx++) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Importing bone '%s'\n", mesh->mBones[bone_idx]->mName.data);
+
+            struct aiBone *bone = mesh->mBones[bone_idx];
+            size_t bone_id = FindBoneByName(scene, bone->mName.data);
+            assert(bone_id != (size_t)-1);
+
+            for (size_t weight_idx = 0; weight_idx < mesh->mBones[bone_idx]->mNumWeights; weight_idx++) {
+                SDL_assert(bone->mWeights[weight_idx].mVertexId < mesh->mNumVertices);
+
+                /* find an empty slot in the bone_ids/weights arrays (marked with -1) */
+                for (size_t bone_ids_idx = 0; bone_ids_idx < 4; bone_ids_idx++) {
+                    if (vertices[bone->mWeights[weight_idx].mVertexId].bone_ids[bone_ids_idx] < 0) {
+                        vertices[bone->mWeights[weight_idx].mVertexId].bone_ids[bone_ids_idx] = bone_id;
+                        vertices[bone->mWeights[weight_idx].mVertexId].weights[bone_ids_idx] = bone->mWeights[weight_idx].mWeight;
+
+                        break;
+                    }
+                }
+            }
         }
 
         for (size_t face_idx = 0; face_idx < mesh->mNumFaces; face_idx++) {
@@ -765,6 +846,9 @@ static inline bool LoadObject(const struct aiScene *pScene, const struct aiNode 
         SDL_free(indices);
     }
 
+    pObjectOut->scene = scene;
+    pObjectOut->parent = pParent;
+
     return true;
 }
 
@@ -799,12 +883,13 @@ static inline struct Object *EmplaceObject() {
 }
 
 /* Recursively load all the objects in the scene starting from node (and its children) */
-static inline bool LoadSceneObjects(const struct aiScene *scene, const struct aiNode *node) {
-    if (node->mNumMeshes > 0 && !LoadObject(scene, node, EmplaceObject())) {
+static inline bool LoadSceneObjects(const struct aiScene *aiScene, struct Scene *scene, const struct aiNode *node, struct Object *parent) {
+    struct Object *object = EmplaceObject();
+    if (!LoadObject(aiScene, scene, node, object, parent)) {
         return false;
     }
     for (size_t i = 0; i < node->mNumChildren; i++) {
-        if (!LoadSceneObjects(scene, node->mChildren[i])) {
+        if (!LoadSceneObjects(aiScene, scene, node->mChildren[i], object)) {
             return false;
         }
     }
@@ -847,22 +932,58 @@ static inline void AppendPlayerObject(struct PlayerObjectList *pPlayerObject) {
 
 /* Loads all the models and stuff necessary for the game! */
 static inline bool LoadScene() {
-    const struct aiScene *scene = aiImportFile("models/test.glb", 0);
+    const struct aiScene *aiScene = aiImportFile("models/test.glb", 0);
+    struct Scene *scene = SDL_malloc(sizeof(struct Scene));
 
-    if (!scene) {
+    if (!aiScene) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to import 'models/test.glb'!\n");
         return false;
     }
 
-    if (!LoadSceneObjects(scene, scene->mRootNode)) {
+    if (aiScene->mNumAnimations > 0) {
+        struct aiAnimation *animation = aiScene->mAnimations[0];
+        
+        for (size_t channel_idx = 0; channel_idx < animation->mNumChannels; channel_idx++) {
+            struct aiNodeAnim *channel = animation->mChannels[channel_idx];
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Importing channel '%s'!\n", channel->mNodeName.data);
+
+            scene->bones[channel_idx].name = channel->mNodeName.data;
+
+            scene->bones[channel_idx].position_key_count = channel->mNumPositionKeys;
+            scene->bones[channel_idx].position_keys = SDL_malloc(sizeof(struct Vec3Keyframe) * scene->bones[channel_idx].position_key_count);
+            for (size_t position_key_idx = 0; position_key_idx < channel->mNumPositionKeys; position_key_idx++) {
+                scene->bones[channel_idx].position_keys[position_key_idx].value = channel->mPositionKeys[position_key_idx].mValue;
+                scene->bones[channel_idx].position_keys[position_key_idx].timestamp = channel->mPositionKeys[position_key_idx].mTime;
+            }
+
+            scene->bones[channel_idx].rotation_key_count = channel->mNumRotationKeys;
+            scene->bones[channel_idx].rotation_keys = SDL_malloc(sizeof(struct QuatKeyframe) * scene->bones[channel_idx].rotation_key_count);
+            for (size_t rotation_key_idx = 0; rotation_key_idx < channel->mNumRotationKeys; rotation_key_idx++) {
+                scene->bones[channel_idx].rotation_keys[rotation_key_idx].value = channel->mRotationKeys[rotation_key_idx].mValue;
+                scene->bones[channel_idx].rotation_keys[rotation_key_idx].timestamp = channel->mRotationKeys[rotation_key_idx].mTime;
+            }
+
+            scene->bones[channel_idx].scale_key_count = channel->mNumScalingKeys;
+            scene->bones[channel_idx].scale_keys = SDL_malloc(sizeof(struct Vec3Keyframe) * scene->bones[channel_idx].scale_key_count);
+            for (size_t scale_key_idx = 0; scale_key_idx < channel->mNumScalingKeys; scale_key_idx++) {
+                scene->bones[channel_idx].scale_keys[scale_key_idx].value = channel->mScalingKeys[scale_key_idx].mValue;
+                scene->bones[channel_idx].scale_keys[scale_key_idx].timestamp = channel->mScalingKeys[scale_key_idx].mTime;
+            }
+
+
+            glm_mat4_identity(scene->bones[channel_idx++].local_transform);
+        }
+    }
+
+    if (!LoadSceneObjects(aiScene, scene, aiScene->mRootNode, NULL)) {
         return false;
     }
 
-    for (size_t i = 0; i < scene->mNumLights; i++) {
+    for (size_t i = 0; i < aiScene->mNumLights; i++) {
         static struct aiLight *light;
-        light = scene->mLights[i];
+        light = aiScene->mLights[i];
         static const struct aiNode *corresponding_node;
-        corresponding_node = GetNodeByName(scene->mRootNode, light->mName.data, light->mName.length);
+        corresponding_node = GetNodeByName(aiScene->mRootNode, light->mName.data, light->mName.length);
  
         static struct aiVector3D position;
         static struct aiQuaternion _;
@@ -896,7 +1017,7 @@ static inline bool LoadScene() {
         lights.lights[lights.lights_count++].ambient[2] = ambient.z;
     }
 
-    aiReleaseImport(scene);
+    aiReleaseImport(aiScene);
 
     const struct aiScene *character_scene = aiImportFile("models/character.glb", 0);
 
@@ -937,7 +1058,8 @@ static inline bool LoadScene() {
 
         player_obj->next = NULL;
 
-        if (!LoadObject(character_scene, character_node, player_obj->obj)) {
+        /* TODO: shouldn't be null */
+        if (!LoadObject(character_scene, NULL, character_node, player_obj->obj, NULL)) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load character node!\n");
             return false;
         }
