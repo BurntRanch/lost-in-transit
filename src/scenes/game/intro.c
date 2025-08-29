@@ -126,22 +126,39 @@ struct Bone {
     struct Vec3Keyframe *scale_keys;
     size_t scale_key_count;
 
-    mat4 local_transform;
+    struct aiMatrix4x4 offset_matrix;
+    struct aiMatrix4x4 local_transform;
+};
+
+struct Animation {
+    double duration;
+    double ticks_per_sec;
 };
 
 struct Scene {
     struct Bone bones[100];
+
     size_t bone_count;
+
+    bool animation_playing;
+    struct Animation current_animation;
+    /* starts from 0 until the end of the animation */
+    double animation_time;
 };
 
 /* An object in the game world */
 struct Object {
+    char *name;
+
     struct aiVector3D position;
     struct aiQuaternion rotation;
     struct aiVector3D scale;
 
     struct Mesh *meshes;
     size_t mesh_count;
+
+    /* don't use this, this is not reliable and only used internally for animations. */
+    struct aiMatrix4x4 transformation;
 
     struct Scene *scene;
     struct Object *parent;
@@ -165,6 +182,8 @@ static SDL_GPUGraphicsPipeline *textured_test_pipeline = NULL;
 
 static struct Object **objects_array = NULL;
 static Uint32 objects_count = 0;
+
+static struct Scene *intro_scene = NULL;
 
 static struct PlayerObjectList *player_objects;
 
@@ -613,6 +632,9 @@ static inline bool LoadObject(const struct aiScene *pScene, struct Scene *scene,
     static size_t mesh_idx;
     static struct aiMesh *mesh;
 
+    pObjectOut->name = SDL_malloc(pNode->mName.length);
+    SDL_memcpy(pObjectOut->name, pNode->mName.data, pNode->mName.length);
+
     aiDecomposeMatrix(&pNode->mTransformation, &pObjectOut->scale, &pObjectOut->rotation, &pObjectOut->position);
 
     pObjectOut->meshes = SDL_malloc(sizeof(struct Mesh) * pNode->mNumMeshes);
@@ -656,6 +678,7 @@ static inline bool LoadObject(const struct aiScene *pScene, struct Scene *scene,
             struct aiBone *bone = mesh->mBones[bone_idx];
             size_t bone_id = FindBoneByName(scene, bone->mName.data);
             assert(bone_id != (size_t)-1);
+            scene->bones[bone_id].offset_matrix = bone->mOffsetMatrix;
 
             for (size_t weight_idx = 0; weight_idx < mesh->mBones[bone_idx]->mNumWeights; weight_idx++) {
                 SDL_assert(bone->mWeights[weight_idx].mVertexId < mesh->mNumVertices);
@@ -933,7 +956,11 @@ static inline void AppendPlayerObject(struct PlayerObjectList *pPlayerObject) {
 /* Loads all the models and stuff necessary for the game! */
 static inline bool LoadScene() {
     const struct aiScene *aiScene = aiImportFile("models/test.glb", 0);
-    struct Scene *scene = SDL_malloc(sizeof(struct Scene));
+    
+    intro_scene = SDL_malloc(sizeof(struct Scene));
+    intro_scene->bone_count = 0;
+    intro_scene->animation_playing = false;
+    intro_scene->current_animation.duration = 0;
 
     if (!aiScene) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to import 'models/test.glb'!\n");
@@ -942,40 +969,43 @@ static inline bool LoadScene() {
 
     if (aiScene->mNumAnimations > 0) {
         struct aiAnimation *animation = aiScene->mAnimations[0];
+
+        intro_scene->current_animation.duration = animation->mDuration;
+        intro_scene->current_animation.ticks_per_sec = animation->mTicksPerSecond;
         
         for (size_t channel_idx = 0; channel_idx < animation->mNumChannels; channel_idx++) {
             struct aiNodeAnim *channel = animation->mChannels[channel_idx];
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Importing channel '%s'!\n", channel->mNodeName.data);
 
-            scene->bones[channel_idx].name = channel->mNodeName.data;
+            intro_scene->bones[channel_idx].name = SDL_malloc(channel->mNodeName.length);
+            SDL_memcpy(intro_scene->bones[channel_idx].name, channel->mNodeName.data, channel->mNodeName.length);
 
-            scene->bones[channel_idx].position_key_count = channel->mNumPositionKeys;
-            scene->bones[channel_idx].position_keys = SDL_malloc(sizeof(struct Vec3Keyframe) * scene->bones[channel_idx].position_key_count);
+            intro_scene->bones[channel_idx].position_key_count = channel->mNumPositionKeys;
+            intro_scene->bones[channel_idx].position_keys = SDL_malloc(sizeof(struct Vec3Keyframe) * intro_scene->bones[channel_idx].position_key_count);
             for (size_t position_key_idx = 0; position_key_idx < channel->mNumPositionKeys; position_key_idx++) {
-                scene->bones[channel_idx].position_keys[position_key_idx].value = channel->mPositionKeys[position_key_idx].mValue;
-                scene->bones[channel_idx].position_keys[position_key_idx].timestamp = channel->mPositionKeys[position_key_idx].mTime;
+                intro_scene->bones[channel_idx].position_keys[position_key_idx].value = channel->mPositionKeys[position_key_idx].mValue;
+                intro_scene->bones[channel_idx].position_keys[position_key_idx].timestamp = channel->mPositionKeys[position_key_idx].mTime;
             }
 
-            scene->bones[channel_idx].rotation_key_count = channel->mNumRotationKeys;
-            scene->bones[channel_idx].rotation_keys = SDL_malloc(sizeof(struct QuatKeyframe) * scene->bones[channel_idx].rotation_key_count);
+            intro_scene->bones[channel_idx].rotation_key_count = channel->mNumRotationKeys;
+            intro_scene->bones[channel_idx].rotation_keys = SDL_malloc(sizeof(struct QuatKeyframe) * intro_scene->bones[channel_idx].rotation_key_count);
             for (size_t rotation_key_idx = 0; rotation_key_idx < channel->mNumRotationKeys; rotation_key_idx++) {
-                scene->bones[channel_idx].rotation_keys[rotation_key_idx].value = channel->mRotationKeys[rotation_key_idx].mValue;
-                scene->bones[channel_idx].rotation_keys[rotation_key_idx].timestamp = channel->mRotationKeys[rotation_key_idx].mTime;
+                intro_scene->bones[channel_idx].rotation_keys[rotation_key_idx].value = channel->mRotationKeys[rotation_key_idx].mValue;
+                intro_scene->bones[channel_idx].rotation_keys[rotation_key_idx].timestamp = channel->mRotationKeys[rotation_key_idx].mTime;
             }
 
-            scene->bones[channel_idx].scale_key_count = channel->mNumScalingKeys;
-            scene->bones[channel_idx].scale_keys = SDL_malloc(sizeof(struct Vec3Keyframe) * scene->bones[channel_idx].scale_key_count);
+            intro_scene->bones[channel_idx].scale_key_count = channel->mNumScalingKeys;
+            intro_scene->bones[channel_idx].scale_keys = SDL_malloc(sizeof(struct Vec3Keyframe) * intro_scene->bones[channel_idx].scale_key_count);
             for (size_t scale_key_idx = 0; scale_key_idx < channel->mNumScalingKeys; scale_key_idx++) {
-                scene->bones[channel_idx].scale_keys[scale_key_idx].value = channel->mScalingKeys[scale_key_idx].mValue;
-                scene->bones[channel_idx].scale_keys[scale_key_idx].timestamp = channel->mScalingKeys[scale_key_idx].mTime;
+                intro_scene->bones[channel_idx].scale_keys[scale_key_idx].value = channel->mScalingKeys[scale_key_idx].mValue;
+                intro_scene->bones[channel_idx].scale_keys[scale_key_idx].timestamp = channel->mScalingKeys[scale_key_idx].mTime;
             }
 
-
-            glm_mat4_identity(scene->bones[channel_idx++].local_transform);
+            aiIdentityMatrix4(&intro_scene->bones[channel_idx++].local_transform);
         }
     }
 
-    if (!LoadSceneObjects(aiScene, scene, aiScene->mRootNode, NULL)) {
+    if (!LoadSceneObjects(aiScene, intro_scene, aiScene->mRootNode, NULL)) {
         return false;
     }
 
@@ -1145,6 +1175,139 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     return true;
 }
 
+static inline void aiVector3Lerp(struct aiVector3D *pFirst, struct aiVector3D *pSecond, double t, struct aiVector3D *pOut) {
+    pOut->x = pFirst->x * (1.0 - t) + pSecond->x * t;
+    pOut->y = pFirst->y * (1.0 - t) + pSecond->y * t;
+    pOut->z = pFirst->z * (1.0 - t) + pSecond->z * t;
+}
+
+static inline void aiQuaternionLerp(struct aiQuaternion *pFirst, struct aiQuaternion *pSecond, double t, struct aiQuaternion *pOut) {
+    pOut->x = pFirst->x * (1.0 - t) + pSecond->x * t;
+    pOut->y = pFirst->y * (1.0 - t) + pSecond->y * t;
+    pOut->z = pFirst->z * (1.0 - t) + pSecond->z * t;
+    pOut->w = pFirst->w * (1.0 - t) + pSecond->w * t;
+}
+
+static inline void aiMatrix4ToMat4(mat4 *dst, struct aiMatrix4x4 *src) {
+    (*dst)[0][0] = src->a1;
+    (*dst)[0][1] = src->a2;
+    (*dst)[0][2] = src->a3;
+    (*dst)[0][3] = src->a4;
+
+    (*dst)[1][0] = src->b1;
+    (*dst)[1][1] = src->b2;
+    (*dst)[1][2] = src->b3;
+    (*dst)[1][3] = src->b4;
+
+    (*dst)[2][0] = src->c1;
+    (*dst)[2][1] = src->c2;
+    (*dst)[2][2] = src->c3;
+    (*dst)[2][3] = src->c4;
+
+    (*dst)[3][0] = src->d1;
+    (*dst)[3][1] = src->d2;
+    (*dst)[3][2] = src->d3;
+    (*dst)[3][3] = src->d4;
+}
+
+static inline void StepAnimation(struct Scene *scene) {
+    if (!scene->animation_playing) {
+        return;
+    }
+
+    scene->animation_time += LEFrametime * scene->current_animation.ticks_per_sec;
+    if (scene->animation_time > scene->current_animation.duration) {
+        scene->animation_playing = false;
+        return;
+    }
+
+    /* update all bone local transforms */
+    for (size_t bone_idx = 0; bone_idx < scene->bone_count; bone_idx++) {
+        struct aiVector3D position, scale;
+        struct aiQuaternion rotation;
+
+        struct Bone *bone = &scene->bones[bone_idx];
+
+        size_t key_idx = 0;
+        for (key_idx = 0; key_idx < bone->position_key_count; key_idx++) {
+            if (bone->position_keys[key_idx].timestamp < scene->animation_time) {
+                continue;
+            }
+
+            if (key_idx == 0) {
+                position = bone->position_keys->value;
+                break;
+            }
+
+            double last_timestamp = bone->position_keys[key_idx - 1].timestamp;
+            double new_timestamp = bone->position_keys[key_idx].timestamp;
+
+            aiVector3Lerp(&bone->position_keys[key_idx - 1].value, &bone->position_keys[key_idx].value, (scene->animation_time - last_timestamp) / (new_timestamp - last_timestamp), &position);
+            break;
+        }
+
+        for (key_idx = 0; key_idx < bone->rotation_key_count; key_idx++) {
+            if (bone->rotation_keys[key_idx].timestamp < scene->animation_time) {
+                continue;
+            }
+
+            if (key_idx == 0) {
+                rotation = bone->rotation_keys->value;
+                break;
+            }
+
+            double last_timestamp = bone->rotation_keys[key_idx - 1].timestamp;
+            double new_timestamp = bone->rotation_keys[key_idx].timestamp;
+
+            aiQuaternionLerp(&bone->rotation_keys[key_idx - 1].value, &bone->rotation_keys[key_idx].value, (scene->animation_time - last_timestamp) / (new_timestamp - last_timestamp), &rotation);
+            break;
+        }
+
+        for (key_idx = 0; key_idx < bone->scale_key_count; key_idx++) {
+            if (bone->scale_keys[key_idx].timestamp < scene->animation_time) {
+                continue;
+            }
+
+            if (key_idx == 0) {
+                scale = bone->scale_keys->value;
+                break;
+            }
+
+            double last_timestamp = bone->scale_keys[key_idx - 1].timestamp;
+            double new_timestamp = bone->scale_keys[key_idx].timestamp;
+
+            aiVector3Lerp(&bone->scale_keys[key_idx - 1].value, &bone->scale_keys[key_idx].value, (scene->animation_time - last_timestamp) / (new_timestamp - last_timestamp), &scale);
+            break;
+        }
+
+        aiMatrix4FromScalingQuaternionPosition(&bone->local_transform, &scale, &rotation, &position);
+    }
+    
+    for (size_t obj_idx = 0; obj_idx < objects_count; obj_idx++) {
+        if (objects_array[obj_idx]->scene != scene) {
+            continue;
+        }
+        size_t bone_id = FindBoneByName(scene, objects_array[obj_idx]->name);
+        if (bone_id == (size_t)-1) {
+            aiMatrix4FromScalingQuaternionPosition(&objects_array[obj_idx]->transformation, &objects_array[obj_idx]->scale, &objects_array[obj_idx]->rotation, &objects_array[obj_idx]->position);
+        } else {
+            objects_array[obj_idx]->transformation = scene->bones[bone_id].local_transform;
+        }
+
+        if (objects_array[obj_idx]->parent) {
+            aiMultiplyMatrix4(&objects_array[obj_idx]->transformation, &objects_array[obj_idx]->parent->transformation);
+        }
+
+        if (bone_id != (size_t)-1) {
+            mat4 bone_matrix;
+            aiMatrix4ToMat4(&bone_matrix, &objects_array[obj_idx]->transformation);
+
+            aiMatrix4ToMat4(&matrices.bone_matrices[bone_id], &scene->bones[bone_id].offset_matrix);
+            glm_mat4_mul(bone_matrix, matrices.bone_matrices[bone_id], matrices.bone_matrices[bone_id]);
+        }
+    }
+}
+
 bool IntroRender(void) {
     /* initialize scene if not initialized, exit on failure */
     if (!objects_array && !LoadScene()) {
@@ -1211,9 +1374,16 @@ bool IntroRender(void) {
 
             glm_mat4_identity(matrices.model);
 
-            glm_translate(matrices.model, (vec3){ obj->position.x, obj->position.y, obj->position.z });
-            glm_quat_rotate(matrices.model, (vec4){ obj->rotation.x, obj->rotation.y, obj->rotation.z, obj->rotation.w }, matrices.model);
-            glm_scale(matrices.model, (vec3){ obj->scale.x, obj->scale.y, obj->scale.z });
+
+            /* move up in the hierarchy (starting with the object) and apply transformations */
+            struct Object *head = obj;
+            while (head) {
+                glm_translate(matrices.model, (vec3){ head->position.x, head->position.y, head->position.z });
+                glm_quat_rotate(matrices.model, (vec4){ head->rotation.x, head->rotation.y, head->rotation.z, head->rotation.w }, matrices.model);
+                glm_scale(matrices.model, (vec3){ head->scale.x, head->scale.y, head->scale.z });
+
+                head = head->parent;
+            }
 
             SDL_PushGPUVertexUniformData(LECommandBuffer, 0, &matrices, sizeof(matrices));
 
@@ -1239,8 +1409,24 @@ bool IntroRender(void) {
 }
 
 void IntroCleanup(void) {
+    if (intro_scene) {
+        for (; intro_scene->bone_count > 0; intro_scene->bone_count--) {
+            struct Bone *bone = &intro_scene->bones[intro_scene->bone_count - 1];
+
+            SDL_free(bone->position_keys);
+            SDL_free(bone->rotation_keys);
+            SDL_free(bone->scale_keys);
+        }
+
+        SDL_free(intro_scene);
+    }
+
     for (; objects_count > 0; objects_count--) {
         struct Object *object = objects_array[objects_count - 1];
+
+        if (object->name) {
+            SDL_free(object->name);
+        }
 
         for (; object->mesh_count > 0; object->mesh_count--) {
             SDL_ReleaseGPUBuffer(gpu_device, object->meshes[object->mesh_count - 1].vertex_buffer.buffer);
