@@ -54,6 +54,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           brew update
+          brew uninstall cmake
           brew install cmake pkgconf make ninja sdl3 sdl3_ttf sdl3_image git protobuf glslang shaderc minizip llvm
 
       - name: Install dependencies (Windows)
