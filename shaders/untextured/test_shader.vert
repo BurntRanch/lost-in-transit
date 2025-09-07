@@ -22,20 +22,18 @@ void main() {
         if (bone_ids[i] == -1) {
             continue;
         }
-        found_any = true;
         if (bone_ids[i] >= 100) {
-            pos = vec4(vert_pos, 1.0f);
             break;
         }
+        found_any = true;
         vec4 local_pos = mats.bone_matrices[bone_ids[i]] * vec4(vert_pos, 1.0f);
         pos += local_pos * weights[i];
     }
     if (!found_any) {
-        pos = vec4(vert_pos, 1.0f);
+        pos = mats.model * vec4(vert_pos, 1.0f);
     }
 
-    mat4 viewModel = mats.view * mats.model;
-    gl_Position = mats.projection * viewModel * pos;
+    gl_Position = mats.projection * mats.view * pos;
     FragPos = vec3(mats.model * vec4(vert_pos, 1.0));
     Normal = vert_norm;
 }
