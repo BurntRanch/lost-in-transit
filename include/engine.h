@@ -11,6 +11,9 @@ extern TTF_Font *pLEGameFont;
 
 extern int LEScreenWidth, LEScreenHeight;
 
+/* Relative X/Y mouse movement */
+extern float LEMouseRelX, LEMouseRelY;
+
 extern double LEFrametime;
 
 /* Only used in 3D accelerated scenes. */

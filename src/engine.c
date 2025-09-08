@@ -436,6 +436,8 @@ static Uint64 now;
 double LEFrametime = 0.0;
 static double time_since_network_tick = 0.0;
 
+float LEMouseRelX, LEMouseRelY;
+
 SDL_GPUCommandBuffer *LECommandBuffer = NULL;
 SDL_GPUTexture *LESwapchainTexture, *LEDepthStencilTexture = NULL;
 Uint32 LESwapchainWidth, LESwapchainHeight = 0;
@@ -453,6 +455,9 @@ bool LEStepRender(void) {
     }
 
     static SDL_Event event;
+
+    LEMouseRelX = 0;
+    LEMouseRelY = 0;
 
     /* Is there a resize event here? if so, we'll apply the update only on the latest resize event */
     static bool window_resized = false;
@@ -494,6 +499,8 @@ bool LEStepRender(void) {
             NETChangeMovement(direction);
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
+            LEMouseRelX += event.motion.xrel;
+            LEMouseRelY += event.motion.yrel;
         } else if (event.type == SDL_EVENT_KEY_UP) {
             /* stop moving in the direction */
             enum MovementDirection direction = NETGetDirection();

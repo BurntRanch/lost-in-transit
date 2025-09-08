@@ -189,6 +189,7 @@ static struct Scene *intro_scene = NULL;
 static struct PlayerObjectList *player_objects;
 
 static vec3 camera_pos = { 0, 0, 0 };
+static float camera_pitch, camera_yaw = 0;
 
 alignas(16) static struct MatricesUBO {
     mat4 model;
@@ -1350,8 +1351,12 @@ bool IntroRender(void) {
 
     StepAnimation(intro_scene);
 
+    camera_yaw += -LEMouseRelX * LEFrametime;
+    camera_pitch = SDL_min(SDL_max(camera_pitch + -LEMouseRelY * LEFrametime, 5.f), 7.5f);
+    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "yaw: %f, pitch: %f\n", camera_yaw, camera_pitch);
+
     glm_perspective(1.0472f, (float)LESwapchainWidth/(float)LESwapchainHeight, 0.1f, 1000.f, matrices.projection);
-    glm_look(camera_pos, (vec3){-1, 0, 0}, (vec3){0, 1, 0}, matrices.view);
+    glm_look(camera_pos, (vec3){SDL_cosf(camera_pitch) * SDL_cosf(camera_yaw), SDL_sinf(camera_pitch), SDL_cosf(camera_pitch) * SDL_sinf(-camera_yaw)}, (vec3){0, 1, 0}, matrices.view);
 
     static SDL_GPUColorTargetInfo color_target_info;
     color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};
