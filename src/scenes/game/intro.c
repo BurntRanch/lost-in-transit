@@ -14,6 +14,7 @@
 #include <SDL3/SDL_platform.h>
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_surface.h>
+#include <SDL3/SDL_video.h>
 #include <SDL3_image/SDL_image.h>
 #include <assert.h>
 #include <assimp/color4.h>
@@ -1194,6 +1195,8 @@ static void OnPlayerUpdate(const ConnectionHandle _, const struct Player * const
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     gpu_device = pGPUDevice;
 
+    LEGrabMouse();
+
     lights.lights_count = 0;
 
     glm_mat4_identity(matrices.view);
@@ -1249,8 +1252,6 @@ static inline void StepAnimation(struct Scene *scene) {
         if (scene->animation_time >= scene->current_animation.duration) {
             scene->animation_time = SDL_fmod(scene->animation_time, scene->current_animation.duration);
         }
-
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "animation time: %f, tps: %f, duration: %f\n", scene->animation_time, scene->current_animation.ticks_per_sec, scene->current_animation.duration);
 
         /* update all bone local transforms */
         for (size_t bone_idx = 0; bone_idx < scene->bone_count; bone_idx++) {
@@ -1312,9 +1313,6 @@ static inline void StepAnimation(struct Scene *scene) {
                 break;
             }
 
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "position for '%s': %f %f %f (XYZ)", bone->name, position.x, position.y, position.z);
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "rotation for '%s': %f %f %f %f (XYZW)", bone->name, rotation.x, rotation.y, rotation.z, rotation.w);
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "scale for '%s': %f %f %f (XYZ)", bone->name, scale.x, scale.y, scale.z);
             aiMatrix4FromScalingQuaternionPosition(&bone->local_transform, &scale, &rotation, &position);
         }
     }
@@ -1447,9 +1445,15 @@ bool IntroRender(void) {
 }
 
 void IntroCleanup(void) {
+    LEReleaseMouse();
+
     if (intro_scene) {
         for (; intro_scene->bone_count > 0; intro_scene->bone_count--) {
             struct Bone *bone = &intro_scene->bones[intro_scene->bone_count - 1];
+
+            if (bone->name) {
+                SDL_free(bone->name);
+            }
 
             /* We don't need to check the other values, because if there's atleast one position key, there's atleast one of every other key. */
             if (bone->position_key_count > 0) {

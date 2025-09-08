@@ -43,6 +43,9 @@ bool LELoadScene(const Uint8 scene);
  */
 void LEScheduleLoadScene(const Uint8 scene);
 
+void LEGrabMouse();
+void LEReleaseMouse();
+
 /* Render the current game state.
  *
  * Sets [LEFrametime] to the frametime in seconds.
