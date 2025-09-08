@@ -5,6 +5,7 @@
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_log.h>
+#include <SDL3/SDL_mouse.h>
 #define TITLE "Lost In Transit"
 
 #include "engine.h"
@@ -414,6 +415,18 @@ void LECleanupScene(void) {
             IntroCleanup();
             break;
         default:;
+    }
+}
+
+void LEGrabMouse() {
+    if (!SDL_SetWindowRelativeMouseMode(window, true)) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "Failed to grab mouse! SDL Error: '%s'.\n", SDL_GetError());
+    }
+}
+
+void LEReleaseMouse() {
+    if (!SDL_SetWindowRelativeMouseMode(window, false)) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "Failed to release mouse! SDL Error: '%s'.\n", SDL_GetError());
     }
 }
 
