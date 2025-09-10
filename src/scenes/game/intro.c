@@ -1222,6 +1222,7 @@ static inline void aiQuaternionLerp(struct aiQuaternion *pFirst, struct aiQuater
     pOut->y = pFirst->y * (1.0 - t) + pSecond->y * t;
     pOut->z = pFirst->z * (1.0 - t) + pSecond->z * t;
     pOut->w = pFirst->w * (1.0 - t) + pSecond->w * t;
+    aiQuaternionNormalize(pOut);
 }
 
 static inline void aiMatrix4ToMat4(mat4 *dst, struct aiMatrix4x4 *src) {
@@ -1351,12 +1352,24 @@ bool IntroRender(void) {
 
     StepAnimation(intro_scene);
 
-    camera_yaw += -LEMouseRelX * LEFrametime;
-    camera_pitch = SDL_min(SDL_max(camera_pitch + -LEMouseRelY * LEFrametime, 5.f), 7.5f);
-    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "yaw: %f, pitch: %f\n", camera_yaw, camera_pitch);
+    camera_pitch = SDL_min(SDL_max(camera_pitch + -LEMouseRelY * LEFrametime, -1.15f), 0.8f);
+    camera_yaw = SDL_fmodf(camera_yaw + -LEMouseRelX * LEFrametime, 6.28f);
+    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "pitch: %f, yaw: %f\n", camera_pitch, camera_yaw);
+    NETChangeCameraDirection((vec2){camera_pitch, camera_yaw});
 
     glm_perspective(1.0472f, (float)LESwapchainWidth/(float)LESwapchainHeight, 0.1f, 1000.f, matrices.projection);
-    glm_look(camera_pos, (vec3){SDL_cosf(camera_pitch) * SDL_cosf(camera_yaw), SDL_sinf(camera_pitch), SDL_cosf(camera_pitch) * SDL_sinf(-camera_yaw)}, (vec3){0, 1, 0}, matrices.view);
+
+    if (NETGetSelfID() >= 0) {
+        static vec3 dir_vec;
+        dir_vec[0] = 1.0f;
+        dir_vec[1] = 0.0f;
+        dir_vec[2] = 0.0f;
+        glm_quat_rotatev((float *)NETGetPlayerByID(NETGetSelfID())->rotation, dir_vec, dir_vec);
+        glm_look(camera_pos, dir_vec, (vec3){0, 1, 0}, matrices.view);
+    } else {
+        /* uhm */
+        glm_look(camera_pos, (vec3){-1.f, 0.f, 0.f}, (vec3){0, 1, 0}, matrices.view);
+    }
 
     static SDL_GPUColorTargetInfo color_target_info;
     color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};

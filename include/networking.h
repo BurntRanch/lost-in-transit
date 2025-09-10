@@ -37,6 +37,7 @@ enum PacketType {
     PACKET_TYPE_TRANSITION,
     PACKET_TYPE_PLAYER_UPDATE,
     PACKET_TYPE_MOVEMENT_UPDATE,
+    PACKET_TYPE_CAMERA_UPDATE,
 };
 
 enum TransDestination {
@@ -108,6 +109,9 @@ enum MovementDirection NETGetDirection();
 
 /* Ask the server to change our movement direction. */
 void NETChangeMovement(enum MovementDirection direction);
+
+/* updates our camera direction, which is client-authoritative. */
+void NETChangeCameraDirection(vec2 yaw_pitch);
 
 void NETTickServer();
 void NETTickClient();

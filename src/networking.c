@@ -5,8 +5,10 @@
 
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_stdinc.h>
+#include <cglm/euler.h>
 #include <cglm/quat.h>
 #include <cglm/types.h>
+#include <cglm/vec2.h>
 #include <cglm/vec3.h>
 #include <limits.h>
 #include <stddef.h>
@@ -68,6 +70,12 @@ struct MovementUpdatePacket {
     enum MovementDirection direction;
 };
 
+struct CameraUpdatePacket {
+    enum PacketType type;
+
+    vec2 pitch_yaw;
+};
+
 /* sent by the server when a players state updates */
 struct PlayerUpdate {
     int id;
@@ -106,6 +114,7 @@ static struct PlayersLinkedList *players = NULL;
 static struct Player *client_self;
 
 static enum MovementDirection client_wanted_direction = MOVEMENT_COMPLETELY_STILL;
+static vec2 client_pitch_yaw = {0, 0};
 
 static enum TransDestination server_current_stage = TRANS_DEST_NONE;
 
@@ -272,8 +281,7 @@ void NETHandleConnect(const enum Role role, const ConnectionHandle handle) {
 
             client_connection = handle;
 
-            /* watch how the server overrides our constant 4500 ID.
-             * the model values (pos/rot/sca) are ignored by the server */
+            /* the model values (pos/rot/sca) are ignored by the server */
             struct HelloPacket packet = {PACKET_TYPE_HELLO, handle, 4500, DEFAULT_POS, DEFAULT_ROT, DEFAULT_SCALE, MOVEMENT_COMPLETELY_STILL};
 
             if (!SRSendToConnection(handle, &packet, sizeof(packet))) {
@@ -538,11 +546,11 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
             break;
         case PACKET_TYPE_MOVEMENT_UPDATE:
             if (role == NET_ROLE_CLIENT) {
-                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (movement update sent from server!)");
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (movement update sent from server!)\n");
                 return;
             }
             if (size < sizeof(struct MovementUpdatePacket)) {
-                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[S]: Received malformed packet! (size < sizeof(struct MovementUpdatePacket))");
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[S]: Received malformed packet! (size < sizeof(struct MovementUpdatePacket))\n");
                 return;
             }
 
@@ -558,6 +566,28 @@ static void HandlePacket(const enum Role role, const ConnectionHandle handle, co
              * Would it even be necessary? If the player isn't allowed to move, the server wouldn't even attempt to move them. */
 
             target_player->ts.active_direction = movement_update_packet->direction;
+
+            break;
+        case PACKET_TYPE_CAMERA_UPDATE:
+            if (role == NET_ROLE_CLIENT) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Received malformed packet! (camera update sent from server!)\n");
+                return;
+            }
+            if (size < sizeof(struct CameraUpdatePacket)) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[S]: Received malformed packet! (size < sizeof(struct CameraUpdatePacket))\n");
+                return;
+            }
+
+            const struct CameraUpdatePacket *camera_update_packet = data;
+            target_player = FindPlayerByHandle(players, handle);
+
+            if (!target_player) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[S]: Can't find camera update packet target!\n");
+                return;
+            }
+
+            /* TODO: since the player is just a box for now, this is fine. But this won't work for bigger models. */
+            glm_euler_xyz_quat((vec3){0.0f, camera_update_packet->pitch_yaw[1], camera_update_packet->pitch_yaw[0]}, target_player->ts.rotation);
 
             break;
         default:
@@ -576,6 +606,10 @@ enum MovementDirection NETGetDirection() {
 
 void NETChangeMovement(enum MovementDirection direction) {
     client_wanted_direction = direction;
+}
+
+void NETChangeCameraDirection(vec2 pitch_yaw) {
+    glm_vec2_copy(pitch_yaw, client_pitch_yaw);
 }
 
 static struct PlayerUpdate *server_player_updates = NULL;
@@ -633,27 +667,26 @@ static void FlushPlayerUpdates() {
 
 /* Move the player in their requested direction */
 static inline void TickPlayerMovement(struct Player *const player) {
-    vec3 direction;
+    static vec3 direction;
     glm_vec3_zero(direction);
     
     if (player->active_direction & MOVEMENT_LEFT) {
-        glm_vec3_add(direction, (vec3){0, 0, 1}, direction);
-    }
-    if (player->active_direction & MOVEMENT_RIGHT) {
         glm_vec3_add(direction, (vec3){0, 0, -1}, direction);
     }
-    if (player->active_direction & MOVEMENT_FORWARD) {
-        glm_vec3_add(direction, (vec3){-1, 0, 0}, direction);
+    if (player->active_direction & MOVEMENT_RIGHT) {
+        glm_vec3_add(direction, (vec3){0, 0, 1}, direction);
     }
-    if (player->active_direction & MOVEMENT_BACKWARD) {
+    if (player->active_direction & MOVEMENT_FORWARD) {
         glm_vec3_add(direction, (vec3){1, 0, 0}, direction);
     }
+    if (player->active_direction & MOVEMENT_BACKWARD) {
+        glm_vec3_add(direction, (vec3){-1, 0, 0}, direction);
+    }
 
-    /* TODO: when players can rotate their cameras, use 'rotation' to decide where the directions are (if we're looking up, 'forward' should be upward) */
-//    static mat3 rot_matrix;
-//    glm_quat_mat3(player->rotation, rot_matrix);
-//    glm_vec3_rotate_m3(rot_matrix, direction, direction);
+    glm_quat_rotatev(player->rotation, direction, direction);
     glm_vec3_normalize(direction);
+
+    /* 0.5 speed */
     glm_vec3_mul(direction, (vec3){ 0.5, 0.5, 0.5 }, direction);
 
     glm_vec3_add(player->position, direction, player->position);
@@ -686,16 +719,19 @@ void NETTickClient() {
         return;
     }
 
-    /* our direction is correct */
-    if (client_self->active_direction == client_wanted_direction) {
-        return;
+    /* our direction must be updated */
+    if (client_self->active_direction != client_wanted_direction) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Updating movement! (%d => %d)\n", client_self->active_direction, client_wanted_direction);
+
+        static struct MovementUpdatePacket packet = {PACKET_TYPE_MOVEMENT_UPDATE, MOVEMENT_COMPLETELY_STILL};
+        packet.direction = client_wanted_direction;
+
+        SRSendToConnection(client_connection, &packet, sizeof(packet));
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Updating movement! (%d => %d)\n", client_self->active_direction, client_wanted_direction);
+    SDL_Log("Updating camera yaw/pitch values!\n");
 
-    static struct MovementUpdatePacket packet = {PACKET_TYPE_MOVEMENT_UPDATE, MOVEMENT_COMPLETELY_STILL};
-    packet.direction = client_wanted_direction;
-
+    struct CameraUpdatePacket packet = {PACKET_TYPE_CAMERA_UPDATE, {client_pitch_yaw[0], client_pitch_yaw[1]}};
     SRSendToConnection(client_connection, &packet, sizeof(packet));
 }
 
