@@ -123,6 +123,9 @@ const struct Player *NETGetPlayerByID(int id);
 /* For the client: Returns this client's ID to the server. */
 int NETGetSelfID();
 
+/* TODO: implement */
+const struct Player *NETGetSelf();
+
 /* Called by steam.cc, only happens from the role of a client that failed to reach a server. in which case this would probably show an error to the user.
  *
  * This function will make no attempt to clean up anything. If the server was already previously connected, NETHandleDisconnect (with a message) should be called instead.

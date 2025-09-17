@@ -54,9 +54,9 @@ endif
 ifeq ($(UNAME_S),Linux)
     LIBNAME     := so
     ifeq ($(DEBUG), 1)
-        CFLAGS   += -fsanitize=undefined
-        CXXFLAGS += -fsanitize=undefined
-        LDFLAGS  += -fsanitize=undefined
+        CFLAGS   += -fsanitize=undefined,address
+        CXXFLAGS += -fsanitize=undefined,address
+        LDFLAGS  += -fsanitize=undefined,address
     endif
 else ifneq ($(UNAME_S),Darwin)
     LIBNAME     := dll

@@ -16,24 +16,20 @@ layout(location = 0) out vec3 FragPos;
 layout(location = 1) out vec3 Normal;
 
 void main() {
-    vec4 pos = vec4(0.0f);
+    mat4 bone_mat = mat4(0.0f);
     bool found_any = false;
     for (int i = 0; i < 4; i++) {
         if (bone_ids[i] == -1) {
             continue;
         }
-        if (bone_ids[i] >= 100) {
-            break;
-        }
         found_any = true;
-        vec4 local_pos = mats.bone_matrices[bone_ids[i]] * vec4(vert_pos, 1.0f);
-        pos += local_pos * weights[i];
+        bone_mat += mats.bone_matrices[bone_ids[i]] * weights[i];
     }
     if (!found_any) {
-        pos = mats.model * vec4(vert_pos, 1.0f);
+        bone_mat = mat4(1.0f);
     }
 
-    gl_Position = mats.projection * mats.view * pos;
-    FragPos = vec3(mats.model * vec4(vert_pos, 1.0));
+    gl_Position = mats.projection * mats.view * mats.model * bone_mat * vec4(vert_pos, 1.0f);
+    FragPos = vec3(mats.model * bone_mat * vec4(vert_pos, 1.0f));
     Normal = vert_norm;
 }
