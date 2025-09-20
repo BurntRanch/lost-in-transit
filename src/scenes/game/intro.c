@@ -130,6 +130,8 @@ struct Bone {
     size_t scale_key_count;
 
     mat4 offset_matrix;
+    mat4 offset_matrix_inv;
+
     mat4 local_transform;
 };
 
@@ -752,6 +754,7 @@ static inline bool LoadObject(const struct aiScene *pScene, struct Scene *scene,
             }
 
             aiMatrix4ToMat4(scene->bones[bone_id].offset_matrix, &bone->mOffsetMatrix);
+            glm_mat4_inv(scene->bones[bone_id].offset_matrix, scene->bones[bone_id].offset_matrix_inv);
             aiMatrix4ToMat4(scene->bones[bone_id].local_transform, &pNode->mTransformation);
 
             for (size_t weight_idx = 0; weight_idx < mesh->mBones[bone_idx]->mNumWeights; weight_idx++) {
@@ -1328,13 +1331,10 @@ static inline void StepAnimation(struct Scene *scene) {
             continue;
         }
 
-        mat4 inverse_offset;
-        glm_mat4_inv(scene->bones[bone_id].offset_matrix, inverse_offset);
-
         /* mesh->bone * bone->bone */
         glm_mul(scene->bones[bone_id].local_transform, scene->bones[bone_id].offset_matrix, objects_array[obj_idx]->transformation);
         /* mesh->bone * bone->mesh, result is a model matrix that does animation. */
-        glm_mul(inverse_offset, objects_array[obj_idx]->transformation, objects_array[obj_idx]->transformation);
+        glm_mul(scene->bones[bone_id].offset_matrix_inv, objects_array[obj_idx]->transformation, objects_array[obj_idx]->transformation);
 
         /* if we have a parent, and the parent is also a bone, do this: */
         if (objects_array[obj_idx]->parent && FindBoneByName(scene, objects_array[obj_idx]->parent->name) != (size_t)-1) {

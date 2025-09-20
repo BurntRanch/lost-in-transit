@@ -21,6 +21,7 @@ void OverWriteConfigFile() {
 
     SDL_IOprintf(stream, "[config]\n");
     SDL_IOprintf(stream, "vsync = %s\n", options.vsync ? "true" : "false");
+    SDL_IOprintf(stream, "cam_sens = %f\n", options.cam_sens);
     
     SDL_CloseIO(stream);
 }
@@ -40,4 +41,10 @@ void InitOptions() {
         error("config option \"config.vsync\" is not a BOOLEAN");
     }
     options.vsync = vsync.u.boolean;
+
+    toml_datum_t cam_sens = toml_seek(result.toptab, "config.cam_sens");
+    if (cam_sens.type != TOML_FP64) {
+        error("config option \"config.cam_sens\" is not FP64");
+    }
+    options.cam_sens = cam_sens.u.fp64;
 }

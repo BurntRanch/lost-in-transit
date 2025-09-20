@@ -32,9 +32,12 @@ static inline float smoothstep(float edge0, float edge1, float x) {
 
 /* uh.. returns false if button_pressed == null and the button was pressed */
 static inline bool activate_button_if_hovering(const int x, const int y, const bool mouse1_held, const struct SDL_FRect *bounds, bool *const button_active, bool *const button_held, void (*const button_pressed)()) {
+    // if we're within bounds
     if ((bounds->x <= x && x <= bounds->w + bounds->x) &&
         (bounds->y <= y && y <= bounds->h + bounds->y)) {
+        // and the button's either hovered or the holding status changed
         if (!(*button_active) || (mouse1_held != *button_held)) {
+            *button_held = mouse1_held;
             if (*button_active && !mouse1_held) {
                 if (button_pressed)
                     button_pressed();
@@ -43,7 +46,6 @@ static inline bool activate_button_if_hovering(const int x, const int y, const b
             }
 
             *button_active = true;
-            *button_held = mouse1_held;
         }
     } else if (*button_active) {
         *button_active = false;

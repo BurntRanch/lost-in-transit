@@ -174,14 +174,13 @@ bool LEInitWindow(void) {
         SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
     }
 
-    if (!(window = SDL_CreateWindow(TITLE, LEScreenWidth, LEScreenHeight, SDL_WINDOW_VULKAN))) {
+    if (!(window = SDL_CreateWindow(TITLE, LEScreenWidth, LEScreenHeight, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE))) {
         SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Something went wrong while creating a window! (SDL Error Code: %s)\n", SDL_GetError());
         return false;
     }
     SDL_SetWindowMinimumSize(window, 400, 300);
 
-    /* We have to call this stupid function, oh well */
-    if (!(renderer = SDL_CreateRenderer(window, "vulkan"))) {
+    if (!(renderer = SDL_CreateRenderer(window, "opengl"))) {
         SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting the renderer! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
@@ -499,8 +498,8 @@ bool LEStepRender(void) {
             NETChangeMovement(direction);
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
-            LEMouseRelX += event.motion.xrel;
-            LEMouseRelY += event.motion.yrel;
+            LEMouseRelX += event.motion.xrel * options.cam_sens;
+            LEMouseRelY += event.motion.yrel * options.cam_sens;
         } else if (event.type == SDL_EVENT_KEY_UP) {
             /* stop moving in the direction */
             enum MovementDirection direction = NETGetDirection();

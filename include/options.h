@@ -5,6 +5,7 @@
 
 extern struct Options_t {
     bool vsync;
+    float cam_sens;
 } options;
 
 void InitOptions();

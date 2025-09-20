@@ -721,15 +721,13 @@ void NETTickClient() {
 
     /* our direction must be updated */
     if (client_self->active_direction != client_wanted_direction) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Updating movement! (%d => %d)\n", client_self->active_direction, client_wanted_direction);
+        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Updating movement! (%d => %d)\n", client_self->active_direction, client_wanted_direction);
 
         static struct MovementUpdatePacket packet = {PACKET_TYPE_MOVEMENT_UPDATE, MOVEMENT_COMPLETELY_STILL};
         packet.direction = client_wanted_direction;
 
         SRSendToConnection(client_connection, &packet, sizeof(packet));
     }
-
-    SDL_Log("Updating camera yaw/pitch values!\n");
 
     struct CameraUpdatePacket packet = {PACKET_TYPE_CAMERA_UPDATE, {client_pitch_yaw[0], client_pitch_yaw[1]}};
     SRSendToConnection(client_connection, &packet, sizeof(packet));
@@ -753,7 +751,7 @@ int NETGetSelfID() {
 }
 
 void NETHandleConnectionFailure(const char *const pReason) {
-    fprintf(stderr, "[C]: Failed to connect to server! (reason: %s)\n", pReason ? pReason : "unexpected error");
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[C]: Failed to connect to server! (reason: %s)\n", pReason ? pReason : "unexpected error");
 
     if (client_disconnect_callback) {
         client_disconnect_callback(0, pReason);
