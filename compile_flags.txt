@@ -1,3 +1,4 @@
+-DLIT_VERSION="v0.1.0"
 -I./include
 -I./external/assimp/include
 -I/usr/local/include/GameNetworkingSockets

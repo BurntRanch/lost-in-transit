@@ -23,7 +23,7 @@ endif
 
 NAME		 = game
 TARGET		?= $(NAME)
-VERSION    	 = 1.0.0
+VERSION    	 = 0.1.0
 SRC_CC  	 = $(wildcard src/*.c src/scenes/*.c src/scenes/game/*.c)
 SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
@@ -31,7 +31,7 @@ OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
 LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image)
 LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lGameNetworkingSockets -lz -lminizip -lcglm -lstdc++
-CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image)
+CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
 CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD)
 CFLAGS		+= -std=$(CSTD)
 
@@ -54,9 +54,9 @@ endif
 ifeq ($(UNAME_S),Linux)
     LIBNAME     := so
     ifeq ($(DEBUG), 1)
-        CFLAGS   += -fsanitize=undefined,address
-        CXXFLAGS += -fsanitize=undefined,address
-        LDFLAGS  += -fsanitize=undefined,address
+        CFLAGS   += -fsanitize=undefined
+        CXXFLAGS += -fsanitize=undefined
+        LDFLAGS  += -fsanitize=undefined
     endif
 else ifneq ($(UNAME_S),Darwin)
     LIBNAME     := dll

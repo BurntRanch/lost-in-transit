@@ -168,6 +168,7 @@ jobs:
           make all CSTD=c17 CXXSTD=c++17 DEBUG=0
 
       - name: Make Release
+        shell: msys2 {0}
         run: cd build/release && zip ../../lost-in-transit.zip *
 
       - name: Upload to github artifacts

@@ -28,6 +28,10 @@ static SDL_Renderer *renderer = NULL;
 static struct LE_Label title_label;
 static SDL_FRect title_dstrect;
 
+/*** Version Title Text ***/
+static struct LE_Label version_title_label;
+static SDL_FRect version_title_dstrect;
+
 /*** Play Button/Text ***/
 static struct LE_Label play_label;
 static struct LE_RenderElement play_element;
@@ -66,6 +70,14 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
     }
     title_dstrect.w = title_label.surface->w;
     title_dstrect.h = title_label.surface->h;
+
+    version_title_label.text = SDL_malloc(32);
+    SDL_memcpy(version_title_label.text, "v"LIT_VERSION, 16);
+    if (!UpdateText(&version_title_label)) {
+        return false;
+    }
+    version_title_dstrect.w = version_title_label.surface->w / 1.4;
+    version_title_dstrect.h = version_title_label.surface->h / 1.4;
 
     play_label.text = "Play!";
     if (!UpdateText(&play_label)) {
@@ -154,11 +166,20 @@ bool MainMenuRender(void) {
         return false;
     }
 
+    version_title_dstrect.x = LEScreenWidth  - version_title_dstrect.w - (LEScreenWidth  * 0.0125);
+    version_title_dstrect.y = LEScreenHeight - version_title_dstrect.h - (LEScreenHeight * 0.0125);
+
+    if (!SDL_RenderTexture(renderer, version_title_label.texture, NULL, &version_title_dstrect)) {
+        fprintf(stderr, "Failed to draw the game version title! (SDL Error Code: %s)\n", SDL_GetError());
+        return false;
+    }
+
     return true;
 }
 
 void MainMenuCleanup(void) {
     DestroyText(&title_label);
+    DestroyText(&version_title_label);
     DestroyText(&play_label);
     DestroyText(&options_label);
     DestroyText(&exit_label);
