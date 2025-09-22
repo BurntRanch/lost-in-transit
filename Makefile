@@ -29,10 +29,10 @@ SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
-LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image)
-LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lGameNetworkingSockets -lz -lminizip -lcglm -lstdc++
+LDFLAGS   	+= -L$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image)
+LDLIBS		+= $(BUILDDIR)/libassimp.a $(BUILDDIR)/libGameNetworkingSockets.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lz -lminizip -lcglm -lstdc++ -lprotobuf -lcrypto
 CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
-CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD)
+CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD) -DSTEAMNETWORKINGSOCKETS_STATIC_LINK=1
 CFLAGS		+= -std=$(CSTD)
 
 SHADER_DIR 	 = shaders
@@ -43,7 +43,6 @@ SPV 		:= $(SPV:.frag=.frag.spv)
 # This is an hacky ugly bastard way to check if we're not in windows
 # just to add UBSAN
 ifeq ($(UNAME_S),Darwin)
-    LIBNAME     := dylib
     LDFLAGS	+= -L/usr/local/lib -Wl,-rpath,/usr/local/lib
     ifeq ($(DEBUG), 1)
     	CFLAGS	 += -fsanitize=undefined
@@ -52,14 +51,13 @@ ifeq ($(UNAME_S),Darwin)
     endif
 endif
 ifeq ($(UNAME_S),Linux)
-    LIBNAME     := so
     ifeq ($(DEBUG), 1)
         CFLAGS   += -fsanitize=undefined
         CXXFLAGS += -fsanitize=undefined
         LDFLAGS  += -fsanitize=undefined
     endif
 else ifneq ($(UNAME_S),Darwin)
-    LIBNAME     := dll
+    LDLIBS	+= -lws2_32 -liphlpapi -ladvapi32 -lcrypt32 -lwinmm
     MINGW_FLAGS := -DOPENSSL_ROOT_DIR=/mingw64 \
   -DOPENSSL_INCLUDE_DIR=/mingw64/include \
   -DOPENSSL_CRYPTO_LIBRARY=/mingw64/lib/libcrypto.dll.a \
@@ -69,13 +67,13 @@ endif
 all: gamenetworkingsockets assimp shaders $(TARGET)
 
 gamenetworkingsockets:
-ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
+ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.a),)
 	mkdir -p $(BUILDDIR) GameNetworkingSockets/build GameNetworkingSockets/build/src
 	cd GameNetworkingSockets && patch -p1 < ../fix-gns-patches.patch
-	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF -DBUILD_TESTS=OFF $(MINGW_FLAGS)
+	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_SHARED_LIB=OFF -DBUILD_TESTS=OFF $(MINGW_FLAGS)
 	cmake --build GameNetworkingSockets/build --config Release
 	cd GameNetworkingSockets && patch -p1 -R < ../fix-gns-patches.patch
-	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
+	cp GameNetworkingSockets/build/src/libGameNetworkingSockets_s.a $(BUILDDIR)/libGameNetworkingSockets.a
 endif
 
 assimp:

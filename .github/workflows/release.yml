@@ -75,7 +75,10 @@ jobs:
           make all CSTD=c2x CXXSTD=c++17 DEBUG=0
 
       - name: Make Release
-        run: cd build/release && tar -zcf ../../lost-in-transit.tar.gz *
+        run: |
+          cd build/release
+          mv game lit-game
+          tar -zcf ../../lost-in-transit.tar.gz lit-game
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -117,7 +120,10 @@ jobs:
           make all DEBUG=0
 
       - name: Make Release
-        run: cd build/release && tar -zcf ../../lost-in-transit.tar.gz *
+        run: |
+          cd build/release
+          mv game lit-game
+          tar -zcf ../../lost-in-transit.tar.gz lit-game
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -169,7 +175,10 @@ jobs:
 
       - name: Make Release
         shell: msys2 {0}
-        run: cd build/release && zip ../../lost-in-transit.zip *
+        run: |
+          cd build/release
+          mv game lit-game
+          zip ../../lost-in-transit.zip lit-game
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
