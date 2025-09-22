@@ -7,15 +7,11 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    name: Build on Linux
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,8 +19,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install dependencies and SDL3
         run: |
           sudo apt-get update && sudo apt-get purge firefox -y
           sudo apt-get install -y build-essential pkg-config protobuf-compiler libprotobuf-dev cmake libminizip-dev libharfbuzz-dev libshaderc-dev glslang-tools glslc make ninja-build git
@@ -50,15 +45,85 @@ jobs:
           ninja
           sudo ninja install
 
-      - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Build and install cglm
+        run: |
+          git clone https://github.com/recp/cglm.git
+          cd cglm
+          mkdir build && cd build
+          cmake -G Ninja .. \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/usr/local
+          ninja
+          sudo ninja install
+
+      - name: Build project
+        run: |
+          make all CSTD=c2x CXXSTD=c++17
+
+      - name: Make Release
+        run: cd build/debug && tar -zcf ../../lost-in-transit.tar.gz *
+
+      - name: Upload to github artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lost-in-transit-linux
+          path: ./lost-in-transit.tar.gz
+
+  build-macos:
+    name: Build on MacOS
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+
+      - name: Install dependencies
         run: |
           brew update
           brew uninstall cmake
           brew install cmake pkg-config make ninja sdl3 sdl3_ttf sdl3_image git protobuf glslang shaderc minizip
 
-      - name: Install dependencies (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Build and install cglm
+        run: |
+          git clone https://github.com/recp/cglm.git
+          cd cglm
+          mkdir build && cd build
+          cmake -G Ninja .. \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/usr/local
+          ninja
+          sudo ninja install
+
+      - name: Build project
+        run: |
+          make all
+
+      - name: Make Release
+        run: cd build/debug && tar -zcf ../../lost-in-transit.tar.gz *
+
+      - name: Upload to github artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lost-in-transit-macos
+          path: ./lost-in-transit.tar.gz
+
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+
+      - name: Install dependencies
         uses: msys2/setup-msys2@v2
         with:
           update: true
@@ -66,6 +131,7 @@ jobs:
             git
             patch
             base-devel
+            zip
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-minizip
             mingw-w64-x86_64-gcc
@@ -81,31 +147,17 @@ jobs:
             mingw-w64-x86_64-openssl
             mingw-w64-x86_64-cglm
 
-      - name: Build and install cglm (Linux/macOS)
-        if: matrix.os != 'windows-latest'
-        run: |
-          git clone https://github.com/recp/cglm.git
-          cd cglm
-          mkdir build && cd build
-          cmake -G Ninja .. \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_INSTALL_PREFIX=/usr/local
-          ninja
-          sudo ninja install
-
-      - name: Build project (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          make all CSTD=c2x CXXSTD=c++17
-
-      - name: Build project (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          make all
-
-      - name: Build project (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Build project
         shell: msys2 {0}
         run: |
           sed -i 's/check_symbol_exists(EVP_MD_CTX_free openssl\/evp.h OPENSSL_NEW_ENOUGH)/set(OPENSSL_NEW_ENOUGH TRUE)/' GameNetworkingSockets/CMakeLists.txt
           make all CSTD=c17 CXXSTD=c++17
+
+      - name: Make Release
+        run: cd build/debug && zip ../../lost-in-transit.zip *
+
+      - name: Upload to github artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lost-in-transit-windows
+          path: ./lost-in-transit.zip

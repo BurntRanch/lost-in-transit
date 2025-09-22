@@ -85,7 +85,7 @@ jobs:
 
   build-macos:
     name: Build on MacOS
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: read
     steps:
@@ -127,7 +127,7 @@ jobs:
 
   build-windows:
     name: Build on Windows
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: read
     steps:
