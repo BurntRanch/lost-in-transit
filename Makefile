@@ -31,7 +31,7 @@ OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
 LDFLAGS   	+= -L$(BUILDDIR) -Wl,-rpath,$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image)
 LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lGameNetworkingSockets -lz -lminizip -lcglm -lstdc++
-CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DVERSION=\"$(VERSION)\"
+CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image)
 CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD)
 CFLAGS		+= -std=$(CSTD)
 
@@ -71,10 +71,10 @@ all: gamenetworkingsockets assimp shaders $(TARGET)
 gamenetworkingsockets:
 ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.$(LIBNAME)),)
 	mkdir -p $(BUILDDIR) GameNetworkingSockets/build GameNetworkingSockets/build/src
-	cd GameNetworkingSockets && patch -p1 < ../fix-string_view-return.patch
+	cd GameNetworkingSockets && patch -p1 < ../fix-gns-patches.patch
 	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_STATIC_LIB=OFF -DBUILD_TESTS=OFF $(MINGW_FLAGS)
 	cmake --build GameNetworkingSockets/build --config Release
-	cd GameNetworkingSockets && patch -p1 -R < ../fix-string_view-return.patch
+	cd GameNetworkingSockets && patch -p1 -R < ../fix-gns-patches.patch
 	cp GameNetworkingSockets/build/bin/libGameNetworkingSockets.$(LIBNAME) $(BUILDDIR)
 endif
 
