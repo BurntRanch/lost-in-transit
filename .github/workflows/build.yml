@@ -165,6 +165,9 @@ jobs:
         shell: msys2 {0}
         run: |
           mv build/debug/game.exe lit-game.exe
+          cp /mingw64/bin/SDL3.dll .
+          cp /mingw64/bin/SDL3_image.dll .
+          cp /mingw64/bin/SDL3_ttf.dll .
           cp /mingw64/bin/libabsl_*.dll .
           cp /mingw64/bin/libbrotlicommon.dll .
           cp /mingw64/bin/libbrotlidec.dll .
