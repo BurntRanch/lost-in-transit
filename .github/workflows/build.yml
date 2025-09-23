@@ -161,7 +161,7 @@ jobs:
         shell: msys2 {0}
         run: |
           mv build/debug/game.exe lit-game.exe
-          tar -zcf lost-in-transit.zip lit-game models shaders images
+          zip lost-in-transit.zip lit-game models shaders images
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
