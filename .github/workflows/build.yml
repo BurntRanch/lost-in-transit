@@ -66,7 +66,7 @@ jobs:
           cp /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* ./libprotobuf.so
           echo "#!/usr/bin/sh" > start-game-linux.sh
           echo "LD_PRELOAD=$(pwd)/libprotobuf.so ./lit-game" >> start-game-linux.sh
-          tar -zcf lost-in-transit.tar.gz lit-game libprotobuf.so models shaders images AdwaitaMono-Regular.ttf
+          tar -zcf lost-in-transit.tar.gz start-game-linux.sh lit-game libprotobuf.so models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
