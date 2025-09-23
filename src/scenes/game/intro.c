@@ -201,11 +201,21 @@ bool IntroRender(void) {
         glm_quat_rotatev((float *)NETGetPlayerByID(NETGetSelfID())->rotation, render_info->dir_vec, render_info->dir_vec);
     }
 
-    if (!LERenderScene3D(intro_scene) || !LEFinishGPURendering()) {
+    if (!LERenderScene3D(intro_scene)) {
         return false;
     }
 
-    return true;
+    static struct PlayerSceneList *head;
+    head = player_scenes;
+
+    while (head) {
+        if (!LERenderScene3D(head->scene)) {
+            return false;
+        }
+        head = head->next;
+    }
+
+    return LEFinishGPURendering();
 }
 
 void IntroCleanup(void) {
@@ -224,4 +234,5 @@ void IntroCleanup(void) {
     }
 
     LEDestroyScene3D(intro_scene);
+    intro_scene = NULL;
 }
