@@ -27,6 +27,9 @@ void OverWriteConfigFile() {
 }
 
 void InitOptions() {
+    options.vsync = true;
+    options.cam_sens = 0.5f;
+
     if (!SDL_GetPathInfo(PATH, NULL)) {
         OverWriteConfigFile();
     }
