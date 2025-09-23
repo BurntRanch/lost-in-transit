@@ -165,7 +165,26 @@ jobs:
         shell: msys2 {0}
         run: |
           mv build/debug/game.exe lit-game.exe
-          zip -r lost-in-transit.zip lit-game models shaders images AdwaitaMono-Regular.ttf
+          cp /mingw64/bin/libabsl_*.dll .
+          cp /mingw64/bin/libbrotlicommon.dll .
+          cp /mingw64/bin/libbrotlidec.dll .
+          cp /mingw64/bin/libbz2-1.dll .
+          cp /mingw64/bin/libcrypto-3-x64.dll .
+          cp /mingw64/bin/libfreetype-6.dll .
+          cp /mingw64/bin/libgcc_s_seh-1.dll .
+          cp /mingw64/bin/libglib-2.0-0.dll .
+          cp /mingw64/bin/libgraphite2.dll .
+          cp /mingw64/bin/libharfbuzz-0.dll .
+          cp /mingw64/bin/libiconv-2.dll .
+          cp /mingw64/bin/libintl-8.dll .
+          cp /mingw64/bin/libpcre2-8-0.dll .
+          cp /mingw64/bin/libpng16-16.dll .
+          cp /mingw64/bin/libprotobuf.dll .
+          cp /mingw64/bin/libstdc++-6.dll .
+          cp /mingw64/bin/libutf8_validity.dll .
+          cp /mingw64/bin/libwinpthread-1.dll .
+          cp /mingw64/bin/zlib1.dll .
+          zip -r lost-in-transit.zip lit-game *.dll models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
