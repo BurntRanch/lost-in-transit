@@ -63,7 +63,7 @@ jobs:
       - name: Make Release
         run: |
           mv build/debug/game lit-game
-          tar -zcf lost-in-transit.tar.gz lit-game /usr/lib/libprotobuf.so models shaders images
+          tar -zcf lost-in-transit.tar.gz lit-game /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* models shaders images
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
