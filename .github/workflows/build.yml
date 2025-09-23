@@ -111,7 +111,7 @@ jobs:
       - name: Make Release
         run: |
           mv build/debug/game lit-game
-          tar -zcf lost-in-transit.tar.gz lit-game models shaders images
+          tar -zcf lost-in-transit.tar.gz lit-game models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -165,7 +165,7 @@ jobs:
         shell: msys2 {0}
         run: |
           mv build/debug/game.exe lit-game.exe
-          zip lost-in-transit.zip lit-game models shaders images
+          zip -r lost-in-transit.zip lit-game models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
