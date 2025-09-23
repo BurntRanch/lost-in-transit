@@ -76,9 +76,12 @@ jobs:
 
       - name: Make Release
         run: |
-          cd build/release
-          mv game lit-game
-          tar -zcf ../../lost-in-transit.tar.gz lit-game
+          mv build/debug/game lit-game
+          cp /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* ./libprotobuf.so
+          echo "#!/usr/bin/sh" > start-game-linux.sh
+          echo "LD_PRELOAD=\$(pwd)/libprotobuf.so ./lit-game" >> start-game-linux.sh
+          chmod +x start-game-linux.sh
+          tar -zcf lost-in-transit.tar.gz start-game-linux.sh lit-game libprotobuf.so models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -121,9 +124,8 @@ jobs:
 
       - name: Make Release
         run: |
-          cd build/release
-          mv game lit-game
-          tar -zcf ../../lost-in-transit.tar.gz lit-game
+          mv build/debug/game lit-game
+          tar -zcf lost-in-transit.tar.gz lit-game models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -176,9 +178,30 @@ jobs:
       - name: Make Release
         shell: msys2 {0}
         run: |
-          cd build/release
-          mv game lit-game
-          zip ../../lost-in-transit.zip lit-game
+          mv build/debug/game.exe lit-game.exe
+          cp /mingw64/bin/SDL3.dll .
+          cp /mingw64/bin/SDL3_image.dll .
+          cp /mingw64/bin/SDL3_ttf.dll .
+          cp /mingw64/bin/libabsl_*.dll .
+          cp /mingw64/bin/libbrotlicommon.dll .
+          cp /mingw64/bin/libbrotlidec.dll .
+          cp /mingw64/bin/libbz2-1.dll .
+          cp /mingw64/bin/libcrypto-3-x64.dll .
+          cp /mingw64/bin/libfreetype-6.dll .
+          cp /mingw64/bin/libgcc_s_seh-1.dll .
+          cp /mingw64/bin/libglib-2.0-0.dll .
+          cp /mingw64/bin/libgraphite2.dll .
+          cp /mingw64/bin/libharfbuzz-0.dll .
+          cp /mingw64/bin/libiconv-2.dll .
+          cp /mingw64/bin/libintl-8.dll .
+          cp /mingw64/bin/libpcre2-8-0.dll .
+          cp /mingw64/bin/libpng16-16.dll .
+          cp /mingw64/bin/libprotobuf.dll .
+          cp /mingw64/bin/libstdc++-6.dll .
+          cp /mingw64/bin/libutf8_validity.dll .
+          cp /mingw64/bin/libwinpthread-1.dll .
+          cp /mingw64/bin/zlib1.dll .
+          zip -r lost-in-transit.zip lit-game.exe *.dll models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
