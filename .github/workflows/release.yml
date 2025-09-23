@@ -76,7 +76,7 @@ jobs:
 
       - name: Make Release
         run: |
-          mv build/debug/game lit-game
+          mv build/release/game lit-game
           cp /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* ./libprotobuf.so
           echo "#!/usr/bin/sh" > start-game-linux.sh
           echo "LD_PRELOAD=\$(pwd)/libprotobuf.so ./lit-game" >> start-game-linux.sh
@@ -124,7 +124,7 @@ jobs:
 
       - name: Make Release
         run: |
-          mv build/debug/game lit-game
+          mv build/release/game lit-game
           tar -zcf lost-in-transit.tar.gz lit-game models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
@@ -178,7 +178,7 @@ jobs:
       - name: Make Release
         shell: msys2 {0}
         run: |
-          mv build/debug/game.exe lit-game.exe
+          mv build/release/game.exe lit-game.exe
           cp /mingw64/bin/SDL3.dll .
           cp /mingw64/bin/SDL3_image.dll .
           cp /mingw64/bin/SDL3_ttf.dll .
