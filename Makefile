@@ -23,7 +23,7 @@ endif
 
 NAME		 = game
 TARGET		?= $(NAME)
-VERSION    	 = 0.1.1
+VERSION    	 = 0.1.2
 SRC_CC  	 = $(wildcard src/*.c src/scenes/*.c src/scenes/game/*.c)
 SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
