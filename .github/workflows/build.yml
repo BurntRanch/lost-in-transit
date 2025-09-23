@@ -62,9 +62,8 @@ jobs:
 
       - name: Make Release
         run: |
-          cd build/debug
-          mv game lit-game
-          tar -zcf ../../lost-in-transit.tar.gz lit-game
+          mv build/debug/game lit-game
+          tar -zcf lost-in-transit.tar.gz lit-game models shaders images
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -107,9 +106,8 @@ jobs:
 
       - name: Make Release
         run: |
-          cd build/debug
-          mv game lit-game
-          tar -zcf ../../lost-in-transit.tar.gz lit-game
+          mv build/debug/game lit-game
+          tar -zcf lost-in-transit.tar.gz lit-game models shaders images
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -162,9 +160,8 @@ jobs:
       - name: Make Release
         shell: msys2 {0}
         run: |
-          cd build/debug
-          mv game lit-game
-          zip ../../lost-in-transit.zip lit-game
+          mv build/debug/game.exe lit-game.exe
+          tar -zcf lost-in-transit.zip lit-game models shaders images
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
