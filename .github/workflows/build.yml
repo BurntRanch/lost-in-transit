@@ -63,7 +63,10 @@ jobs:
       - name: Make Release
         run: |
           mv build/debug/game lit-game
-          tar -zcf lost-in-transit.tar.gz lit-game /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* models shaders images
+          cp /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* ./libprotobuf.so
+          echo "#!/usr/bin/sh" > start-game-linux.sh
+          echo "LD_PRELOAD=$(pwd)/libprotobuf.so ./lit-game" >> start-game-linux.sh
+          tar -zcf lost-in-transit.tar.gz lit-game libprotobuf.so models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
