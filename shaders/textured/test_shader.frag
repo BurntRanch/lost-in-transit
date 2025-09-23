@@ -12,6 +12,8 @@ struct Light {
     vec3 diffuse;
     vec3 specular;
     vec3 ambient;
+
+    double _;
 };
 
 layout(std140, set = 3, binding = 0) uniform material {
@@ -51,6 +53,6 @@ void main() {
         result += (light.ambient * mat.ambient) + (diff * light.diffuse * mat.diffuse) + (spec * light.specular * mat.specular) * (1.0 / lights.lights_count);
     }
 
-    result *= max(texture(tex, uv).xyz, mat.ambient);
+    result *= texture(tex, uv).xyz;
     outColor = vec4(result, 1.0);
 }

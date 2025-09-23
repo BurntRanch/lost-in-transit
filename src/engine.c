@@ -5,6 +5,7 @@
 #include "networking.h"
 #include "options.h"
 #include "scenes/game/intro.h"
+#include <SDL3/SDL_assert.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_log.h>
@@ -103,6 +104,8 @@ struct Light {
 
     vec3 ambient;
     float pad4;
+
+    Uint64 scene_ptr;
 };
 
 struct Vertex {
@@ -151,12 +154,12 @@ struct Mesh {
     struct Buffer index_buffer;
 };
 
-struct LightUBO {
+static struct LightUBO {
     int lights_count; // 4 bytes
     char pad1[12];  // 12 + 4 bytes
 
     struct Light lights[256]; // starts at 16 bytes
-};
+} light_ubo = {0};
 
 struct Scene3D {
     struct Bone bones[100];
@@ -171,8 +174,6 @@ struct Scene3D {
      * Objects are guaranteed to be stored before their children (if any). */
     struct Object *objects;
     size_t object_count;
-
-    struct LightUBO light_ubo;
 };
 
 struct Shader {
@@ -1369,8 +1370,6 @@ struct Scene3D *LEImportScene3D(const char * const filename) {
     scene3d->object_count = 0;
     scene3d->objects = NULL;
 
-    scene3d->light_ubo.lights_count = SDL_min(aiScene->mNumLights, 256);
-
     if (!aiScene) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to import 3D scene '%s'!\n", filename);
         return NULL;
@@ -1427,7 +1426,7 @@ struct Scene3D *LEImportScene3D(const char * const filename) {
         return NULL;
     }
 
-    for (int i = 0; i < scene3d->light_ubo.lights_count; i++) {
+    for (size_t i = 0; i < aiScene->mNumLights; i++) {
         static struct aiLight *light;
         light = aiScene->mLights[i];
         static const struct aiNode *corresponding_node;
@@ -1448,10 +1447,15 @@ struct Scene3D *LEImportScene3D(const char * const filename) {
         aiVector3DivideByScalar(&specular, SDL_max(SDL_max(SDL_max(light->mColorSpecular.r, light->mColorSpecular.g), light->mColorSpecular.b), 1.0));
         aiVector3DivideByScalar(&ambient, SDL_max(SDL_max(SDL_max(light->mColorAmbient.r, light->mColorAmbient.g), light->mColorAmbient.b), 1.0));
 
-        aiVector3ToVec3(&position, scene3d->light_ubo.lights[i].pos);
-        aiVector3ToVec3(&diffuse, scene3d->light_ubo.lights[i].diffuse);
-        aiVector3ToVec3(&specular, scene3d->light_ubo.lights[i].specular);
-        aiVector3ToVec3(&ambient, scene3d->light_ubo.lights[i].ambient);
+        aiVector3ToVec3(&position, light_ubo.lights[light_ubo.lights_count].pos);
+        aiVector3ToVec3(&diffuse, light_ubo.lights[light_ubo.lights_count].diffuse);
+        aiVector3ToVec3(&specular, light_ubo.lights[light_ubo.lights_count].specular);
+        aiVector3ToVec3(&ambient, light_ubo.lights[light_ubo.lights_count].ambient);
+
+        light_ubo.lights[light_ubo.lights_count].scene_ptr = (Uint64)scene3d;
+
+        light_ubo.lights_count++;
+        SDL_assert(light_ubo.lights_count < 256);
     }
 
     aiReleaseImport(aiScene);
@@ -1617,7 +1621,7 @@ bool LERenderScene3D(struct Scene3D *pScene3D) {
             SDL_PushGPUVertexUniformData(LECommandBuffer, 0, &matrices, sizeof(matrices));
 
             SDL_PushGPUFragmentUniformData(LECommandBuffer, 0, &mesh->material, sizeof(mesh->material));
-            SDL_PushGPUFragmentUniformData(LECommandBuffer, 1, &pScene3D->light_ubo, sizeof(pScene3D->light_ubo));
+            SDL_PushGPUFragmentUniformData(LECommandBuffer, 1, &light_ubo, sizeof(light_ubo));
             SDL_PushGPUFragmentUniformData(LECommandBuffer, 2, &render_info.cam_pos, sizeof(vec3));
 
             if (mesh->shader == TEXTURED_TEST_SHADER) {
@@ -1672,6 +1676,17 @@ void LEDestroyScene3D(struct Scene3D *pScene3D) {
     }
     if (pScene3D->objects) {
         SDL_free(pScene3D->objects);
+    }
+
+    /* loop through the lights and remove any lights imported from this scene */
+    int i;
+    for (i = 0; i < light_ubo.lights_count;) {
+        if (light_ubo.lights[i].scene_ptr != (Uint64)pScene3D) {
+            i++;
+            continue;
+        }
+        SDL_memmove(&light_ubo.lights[i], &light_ubo.lights[i + 1], (light_ubo.lights_count - (i + 1)) * sizeof(struct Light));
+        light_ubo.lights_count--;
     }
 
     SDL_free(pScene3D);

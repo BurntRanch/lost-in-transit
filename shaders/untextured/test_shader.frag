@@ -9,6 +9,8 @@ struct Light {
     vec3 diffuse;
     vec3 specular;
     vec3 ambient;
+
+    double _;
 };
 
 layout(std140, set = 3, binding = 0) uniform material {
