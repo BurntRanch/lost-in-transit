@@ -187,7 +187,7 @@ jobs:
           cp /mingw64/bin/libutf8_validity.dll .
           cp /mingw64/bin/libwinpthread-1.dll .
           cp /mingw64/bin/zlib1.dll .
-          zip -r lost-in-transit.zip lit-game *.dll models shaders images AdwaitaMono-Regular.ttf
+          zip -r lost-in-transit.zip lit-game.exe *.dll models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
