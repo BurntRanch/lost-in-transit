@@ -63,9 +63,17 @@ jobs:
       - name: Make Release
         run: |
           mv build/debug/game lit-game
-          cp /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* ./libprotobuf.so
+          cp /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.*.* ./libprotobuf.so
+          cp /usr/lib/x86_64-linux-gnu/libfreetype.so.*.*.* ./libfreetype.so
+          cp /usr/lib/x86_64-linux-gnu/libgraphite2.so.*.*.* ./libgraphite2.so
+          cp /usr/lib/x86_64-linux-gnu/libharfbuzz.so.*.*.* ./libharfbuzz.so
+          cp /usr/lib/x86_64-linux-gnu/libminizip.so.*.*.* ./libminizip.so
+          cp /usr/lib/x86_64-linux-gnu/libpng16.so.*.*.* ./libpng16.so
+          cp /usr/lib/x86_64-linux-gnu/libSDL3_image.so.*.*.* ./libSDL3_image.so
+          cp /usr/lib/x86_64-linux-gnu/libSDL3.so.*.*.* ./libSDL3.so
+          cp /usr/lib/x86_64-linux-gnu/libSDL3_ttf.so.*.*.* ./libSDL3_ttf.so
           echo "#!/usr/bin/sh" > start-game-linux.sh
-          echo "LD_PRELOAD=\$(pwd)/libprotobuf.so ./lit-game" >> start-game-linux.sh
+          echo "LD_PRELOAD=./libprotobuf.so:./libfreetype.so:./libgraphite2.so:./libharfbuzz.so:./libminizip.so:./libpng16.so:./libSDL3_image.so:./libSDL3.so:./libSDL3_ttf.so ./lit-game" >> start-game-linux.sh
           chmod +x start-game-linux.sh
           tar -zcf lost-in-transit.tar.gz start-game-linux.sh lit-game libprotobuf.so models shaders images AdwaitaMono-Regular.ttf
 
