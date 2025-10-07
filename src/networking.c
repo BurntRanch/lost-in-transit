@@ -24,6 +24,9 @@
 #define DEFAULT_ROT {0.f, 0.f, 0.f, 1.f}
 #define DEFAULT_SCALE {1.f, 1.f, 1.f}
 
+#define toStr_impl(x) #x
+#define toStr(x) toStr_impl(x)
+
 /* Sent by a client, echo'd out by the server. */
 struct HelloPacket {
     enum PacketType type;
@@ -327,8 +330,8 @@ static inline void Server_HandleHelloPacket(const ConnectionHandle handle, const
     struct PlayersLinkedList *player_list = AddPlayer(handle, hello_packet->id);
 
     if (!player_list) {
-        /* there's no way we reached 2147483647 players */
-        SRDisconnectClient(handle, "Sorry buddy, We already have 2147483647 players before you.\n(please report this bug thx XOXO --BurntRanch)");
+        /* there's no way we reached 2147483647 players (unless we are not in x86_64) */
+        SRDisconnectClient(handle, "Sorry buddy, We already have " toStr(INT_MAX) " players before you.\n(please report this bug thx XOXO --BurntRanch)");
         return;
     }
 
