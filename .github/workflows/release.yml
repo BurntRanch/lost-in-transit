@@ -41,21 +41,21 @@ jobs:
           tar -xvzf SDL3-3.2.18.tar.gz
           cd SDL3-3.2.18
           mkdir build && cd build
-          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_UNIX_CONSOLE_BUILD=ON
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_UNIX_CONSOLE_BUILD=ON -DSDL_X11=ON -DSDL_X11_SHARED=OFF
           ninja
           sudo ninja install
           wget https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
           tar -xvzf SDL3_ttf-3.2.2.tar.gz
           cd SDL3_ttf-3.2.2
           mkdir build && cd build
-          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_UNIX_CONSOLE_BUILD=ON
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_UNIX_CONSOLE_BUILD=ON -DSDL_X11=ON
           ninja
           sudo ninja install
           wget https://github.com/libsdl-org/SDL_image/releases/download/release-3.2.4/SDL3_image-3.2.4.tar.gz
           tar -xvzf SDL3_image-3.2.4.tar.gz
           cd SDL3_image-3.2.4
           mkdir build && cd build
-          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_UNIX_CONSOLE_BUILD=ON
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DSDL_UNIX_CONSOLE_BUILD=ON -DSDL_X11=ON
           ninja
           sudo ninja install
 
@@ -76,12 +76,12 @@ jobs:
 
       - name: Make Release
         run: |
-          mv build/release/game lit-game
-          cp /usr/lib/x86_64-linux-gnu/libprotobuf.so.*.* ./libprotobuf.so
+          mv build/debug/game lit-game
+          mkdir lib
+          ldd ./lit-game | awk '{print $3}' | xargs -i cp {} ./lib
+          rm -f lib/{libc.so*,ld-linux-*,libgcc_s.so*,libstdc++.so*,libm.so*}
           echo "#!/usr/bin/sh" > start-game-linux.sh
-          echo "LD_PRELOAD=\$(pwd)/libprotobuf.so ./lit-game" >> start-game-linux.sh
-          chmod +x start-game-linux.sh
-          tar -zcf lost-in-transit.tar.gz start-game-linux.sh lit-game libprotobuf.so models shaders images AdwaitaMono-Regular.ttf
+          tar -zcf lost-in-transit.tar.gz lit-game lib models shaders images AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
