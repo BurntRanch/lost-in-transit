@@ -29,8 +29,8 @@ SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
-LDFLAGS   	+= -L$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image)
-LDLIBS		+= $(BUILDDIR)/libassimp.a $(BUILDDIR)/libGameNetworkingSockets.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lz -lminizip -lcglm -lstdc++ -lprotobuf -lcrypto
+LDFLAGS   	+= -L$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image) -Wl,-rpath,lib
+LDLIBS		+= $(BUILDDIR)/libassimp.a $(BUILDDIR)/libGameNetworkingSockets.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lz -lminizip -lstdc++ -lprotobuf -lcrypto
 CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
 CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD) -DSTEAMNETWORKINGSOCKETS_STATIC_LINK=1
 CFLAGS		+= -std=$(CSTD)
