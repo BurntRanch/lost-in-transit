@@ -78,7 +78,7 @@ jobs:
 
       - name: Make Release
         run: |
-          mv build/debug/game lit-game
+          mv build/release/game lit-game
           mkdir lib
           ldd ./lit-game | awk '{print $3}' | xargs -i cp {} ./lib
           rm -f lib/{libc.so*,ld-linux-*,libgcc_s.so*,libstdc++.so*,libm.so*}
