@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies and SDL3
         run: |
           sudo apt-get update && sudo apt-get purge firefox -y
-          sudo apt-get install -y build-essential pkg-config protobuf-compiler libprotobuf-dev cmake libminizip-dev libharfbuzz-dev libshaderc-dev glslang-tools glslc make ninja-build git
+          sudo apt-get install -y build-essential pkg-config protobuf-compiler libprotobuf-dev cmake libminizip-dev libharfbuzz-dev libshaderc-dev glslang-tools glslc make vulkan ninja-build git
           wget https://github.com/libsdl-org/SDL/releases/download/release-3.2.18/SDL3-3.2.18.tar.gz
           tar -xvzf SDL3-3.2.18.tar.gz
           cd SDL3-3.2.18
