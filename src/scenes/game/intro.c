@@ -7,6 +7,7 @@
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_platform.h>
+#include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_video.h>
@@ -41,7 +42,12 @@ static struct Scene3D *intro_scene = NULL;
 static float camera_pitch, camera_yaw = 0;
 static vec4 camera_rotation;
 
+/* The direction the player is moving towards. */
+static vec3 player_direction;
+
 static struct RenderInfo *render_info;
+
+const float speed = 10.0f;
 
 bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     gpu_device = pGPUDevice;
@@ -85,11 +91,52 @@ bool IntroRender(void) {
     glm_euler_xyz_quat((vec3){0.0f, camera_yaw, camera_pitch}, camera_rotation);
     glm_quat_rotatev(camera_rotation, render_info->dir_vec, render_info->dir_vec);
 
+    static vec3 dir;
+    glm_quat_rotatev(camera_rotation, player_direction, dir);
+    glm_vec3_muladds(dir, LEFrametime, render_info->cam_pos);
+
     if (!LERenderScene3D(intro_scene)) {
         return false;
     }
 
     return LEFinishGPURendering();
+}
+
+void IntroKeyDown(SDL_Scancode scancode) {
+    switch (scancode) {
+        case SDL_SCANCODE_W:
+            player_direction[0] = 1.f * speed;
+            break;
+        case SDL_SCANCODE_A:
+            player_direction[2] = -1.f * speed;
+            break;
+        case SDL_SCANCODE_S:
+            player_direction[0] = -1.f * speed;
+            break;
+        case SDL_SCANCODE_D:
+            player_direction[2] = 1.f * speed;
+            break;
+        default:
+            ;
+    }
+}
+void IntroKeyUp(SDL_Scancode scancode) {
+    switch (scancode) {
+        case SDL_SCANCODE_W:
+            player_direction[0] = 0.f;
+            break;
+        case SDL_SCANCODE_A:
+            player_direction[2] = 0.f;
+            break;
+        case SDL_SCANCODE_S:
+            player_direction[0] = 0.f;
+            break;
+        case SDL_SCANCODE_D:
+            player_direction[2] = 0.f;
+            break;
+        default:
+            ;
+    }
 }
 
 void IntroCleanup(void) {

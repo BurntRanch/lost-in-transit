@@ -1734,8 +1734,25 @@ bool LEStepRender(void) {
     static bool window_resized = false;
     while (SDL_PollEvent(&event)) {
         /* If escape is held down OR a window close is requested, return false. */
-        if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) || event.type == SDL_EVENT_QUIT) {
+        if (event.type == SDL_EVENT_QUIT) {
             return false;
+        } else if (event.type == SDL_EVENT_KEY_DOWN) {
+            if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
+                return false;
+            }
+            switch (scene_loaded) {
+                case SCENE3D_INTRO:
+                    IntroKeyDown(event.key.scancode);
+                default:
+                    ;
+            }
+        } else if (event.type == SDL_EVENT_KEY_UP) {
+            switch (scene_loaded) {
+                case SCENE3D_INTRO:
+                    IntroKeyUp(event.key.scancode);
+                default:
+                    ;
+            }
         } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
             LEScreenWidth = event.window.data1;
             LEScreenHeight = event.window.data2;
