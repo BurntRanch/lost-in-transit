@@ -1,8 +1,6 @@
 CC      ?= gcc
-CXX	?= g++
 GLSLC	?= glslc
 CSTD	?= c23
-CXXSTD  ?= c++20
 
 UNAME_S := $(shell uname -s)
 DEBUG  	?= 1
@@ -25,15 +23,11 @@ NAME		 = game
 TARGET		?= $(NAME)
 VERSION    	 = 0.1.4-2
 SRC_CC  	 = $(wildcard src/*.c src/scenes/*.c src/scenes/game/*.c)
-SRC_CXX		 = $(wildcard src/*.cc)
 OBJ_CC  	 = $(SRC_CC:.c=.o)
-OBJ_CXX		 = $(SRC_CXX:.cc=.o)
-OBJ		 = $(OBJ_CC) $(OBJ_CXX)
+OBJ		 = $(OBJ_CC)
 LDFLAGS   	+= -L$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image) -Wl,-rpath,lib
-LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lz -lminizip -lstdc++ -lprotobuf -lcrypto
-CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
-CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD)
-CFLAGS		+= -std=$(CSTD)
+LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lz -lminizip -lstdc++
+CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -std=$(CSTD) $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
 
 SHADER_DIR 	 = shaders
 SHADERS 	 = $(wildcard $(SHADER_DIR)/untextured/*.vert $(SHADER_DIR)/untextured/*.frag $(SHADER_DIR)/textured/*.vert $(SHADER_DIR)/textured/*.frag)
@@ -46,14 +40,12 @@ ifeq ($(UNAME_S),Darwin)
     LDFLAGS	+= -L/usr/local/lib -Wl,-rpath,/usr/local/lib
     ifeq ($(DEBUG), 1)
     	CFLAGS	 += -fsanitize=undefined
-        CXXFLAGS += -fsanitize=undefined
     	LDFLAGS  += -fsanitize=undefined
     endif
 endif
 ifeq ($(UNAME_S),Linux)
     ifeq ($(DEBUG), 1)
         CFLAGS   += -fsanitize=undefined
-        CXXFLAGS += -fsanitize=undefined
         LDFLAGS  += -fsanitize=undefined
     endif
 else ifneq ($(UNAME_S),Darwin)
