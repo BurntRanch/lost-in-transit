@@ -30,9 +30,9 @@ OBJ_CC  	 = $(SRC_CC:.c=.o)
 OBJ_CXX		 = $(SRC_CXX:.cc=.o)
 OBJ		 = $(OBJ_CC) $(OBJ_CXX)
 LDFLAGS   	+= -L$(BUILDDIR) $(shell pkg-config --libs-only-L --libs-only-other sdl3 sdl3-ttf sdl3-image) -Wl,-rpath,lib
-LDLIBS		+= $(BUILDDIR)/libassimp.a $(BUILDDIR)/libGameNetworkingSockets.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lz -lminizip -lstdc++ -lprotobuf -lcrypto
-CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -IGameNetworkingSockets/include $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
-CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD) -DSTEAMNETWORKINGSOCKETS_STATIC_LINK=1
+LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-ttf sdl3-image) -lm -lz -lminizip -lstdc++ -lprotobuf -lcrypto
+CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
+CXXFLAGS	+= $(CFLAGS) -std=$(CXXSTD)
 CFLAGS		+= -std=$(CSTD)
 
 SHADER_DIR 	 = shaders
@@ -64,17 +64,7 @@ else ifneq ($(UNAME_S),Darwin)
   -DOPENSSL_SSL_LIBRARY=/mingw64/lib/libssl.dll.a
 endif
 
-all: gamenetworkingsockets assimp shaders $(TARGET)
-
-gamenetworkingsockets:
-ifeq ($(wildcard $(BUILDDIR)/libGameNetworkingSockets.a),)
-	mkdir -p $(BUILDDIR) GameNetworkingSockets/build GameNetworkingSockets/build/src
-	cd GameNetworkingSockets && patch -p1 < ../fix-gns-patches.patch
-	cmake -S GameNetworkingSockets/ -B GameNetworkingSockets/build -DBUILD_SHARED_LIB=OFF -DBUILD_TESTS=OFF $(MINGW_FLAGS)
-	cmake --build GameNetworkingSockets/build --config Release
-	cd GameNetworkingSockets && patch -p1 -R < ../fix-gns-patches.patch
-	cp GameNetworkingSockets/build/src/libGameNetworkingSockets_s.a $(BUILDDIR)/libGameNetworkingSockets.a
-endif
+all: assimp shaders $(TARGET)
 
 assimp:
 ifeq ($(wildcard $(BUILDDIR)/libassimp.a),)
@@ -87,7 +77,7 @@ ifeq ($(wildcard $(BUILDDIR)/libassimp.a),)
 	cp external/assimp/build/include/assimp/config.h external/assimp/build/include/assimp/revision.h external/assimp/include/assimp/
 endif
 
-$(TARGET): shaders assimp gamenetworkingsockets $(OBJ)
+$(TARGET): shaders assimp $(OBJ)
 	mkdir -p $(BUILDDIR)
 	$(CC) $(OBJ) -o $(BUILDDIR)/$(TARGET) $(LDFLAGS) $(LDLIBS)
 
@@ -97,4 +87,4 @@ clean:
 shaders:
 	for f in $(SHADERS); do $(GLSLC) -I shaders/ $$f -o $$f.spv; done
 
-.PHONY: $(TARGET) clean gamenetworkingsockets assimp shaders all
+.PHONY: $(TARGET) clean assimp shaders all
