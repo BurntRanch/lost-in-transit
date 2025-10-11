@@ -60,6 +60,12 @@ bool IntroInit(SDL_GPUDevice *pGPUDevice) {
     render_info->viewport.min_depth = 0.f;
     render_info->viewport.max_depth = 1.f;
 
+    camera_pitch = 0.f;
+    camera_yaw = 0.f;
+
+    glm_vec3_zero(player_direction);
+    glm_vec3_zero(render_info->cam_pos);
+
     return true;
 }
 
@@ -105,16 +111,16 @@ bool IntroRender(void) {
 void IntroKeyDown(SDL_Scancode scancode) {
     switch (scancode) {
         case SDL_SCANCODE_W:
-            player_direction[0] = 1.f * speed;
+            player_direction[0] = SDL_min(player_direction[0] + speed, speed);
             break;
         case SDL_SCANCODE_A:
-            player_direction[2] = -1.f * speed;
+            player_direction[2] = SDL_max(player_direction[2] - speed, -speed);
             break;
         case SDL_SCANCODE_S:
-            player_direction[0] = -1.f * speed;
+            player_direction[0] = SDL_max(player_direction[0] - speed, -speed);
             break;
         case SDL_SCANCODE_D:
-            player_direction[2] = 1.f * speed;
+            player_direction[2] = SDL_min(player_direction[2] + speed, speed);
             break;
         default:
             ;
@@ -123,16 +129,16 @@ void IntroKeyDown(SDL_Scancode scancode) {
 void IntroKeyUp(SDL_Scancode scancode) {
     switch (scancode) {
         case SDL_SCANCODE_W:
-            player_direction[0] = 0.f;
+            player_direction[0] = SDL_max(player_direction[0] - speed, -speed);
             break;
         case SDL_SCANCODE_A:
-            player_direction[2] = 0.f;
+            player_direction[2] = SDL_min(player_direction[2] + speed, speed);
             break;
         case SDL_SCANCODE_S:
-            player_direction[0] = 0.f;
+            player_direction[0] = SDL_min(player_direction[0] + speed, speed);
             break;
         case SDL_SCANCODE_D:
-            player_direction[2] = 0.f;
+            player_direction[2] = SDL_max(player_direction[2] - speed, -speed);
             break;
         default:
             ;

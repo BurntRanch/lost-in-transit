@@ -1737,14 +1737,22 @@ bool LEStepRender(void) {
         if (event.type == SDL_EVENT_QUIT) {
             return false;
         } else if (event.type == SDL_EVENT_KEY_DOWN) {
-            if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-                return false;
-            }
-            switch (scene_loaded) {
-                case SCENE3D_INTRO:
-                    IntroKeyDown(event.key.scancode);
+            switch (event.key.scancode) {
+                case SDL_SCANCODE_ESCAPE:
+                    return false;
+                case SDL_SCANCODE_TAB:
+                    Navigate(event.key.mod & SDL_KMOD_SHIFT);
+                    break;
+                case SDL_SCANCODE_SPACE:
+                    PressActiveButton();
+                    break;
                 default:
-                    ;
+                    switch (scene_loaded) {
+                        case SCENE3D_INTRO:
+                            IntroKeyDown(event.key.scancode);
+                        default:
+                            ;
+                    }
             }
         } else if (event.type == SDL_EVENT_KEY_UP) {
             switch (scene_loaded) {
