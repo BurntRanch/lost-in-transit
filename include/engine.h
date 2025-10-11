@@ -55,9 +55,6 @@ bool LEInitWindow(void);
 /* Returns true on success. */
 bool LEInitTTF(void);
 
-/* So far, only initializes GameNetworkingSockets. This will change to initialize the full Steam API. (once I actually get my hands on it) */
-bool LEInitSteam(void);
-
 /* Loads a scene **immediately**, This is not safe to run multi-threaded or inside of a scenes render function. Consider calling LEScheduleLoadScene for that purpose instead.
  * Refer to scenes.h
  * Returns true on success.

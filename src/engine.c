@@ -2,7 +2,6 @@
 #include "assimp/scene.h"
 #include "assimp/vector3.h"
 #include "button.h"
-#include "networking.h"
 #include "options.h"
 #include "scenes/game/intro.h"
 #include <SDL3/SDL_assert.h>
@@ -23,8 +22,6 @@
 
 #include "scenes/main_menu.h"
 #include "scenes/options.h"
-#include "scenes/lobby.h"
-#include "scenes/play.h"
 
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
@@ -41,8 +38,6 @@
 #include <SDL3/SDL_stdinc.h>
 
 #include <SDL3_ttf/SDL_ttf.h>
-
-#include "steam.hh"
 
 #include <stdio.h>
 #include <time.h>
@@ -364,10 +359,6 @@ bool LEInitTTF(void) {
     return true;
 }
 
-bool LEInitSteam(void) {
-    return SRInitGNS();
-}
-
 void DestroyText(struct LE_Label *const pLEText) {
     if (pLEText->texture) {
         SDL_DestroyTexture(pLEText->texture);
@@ -526,16 +517,6 @@ bool LELoadScene(const Uint8 scene) {
             break;
         case SCENE_OPTIONS:
             if (!OptionsInit(renderer)) {
-                return false;
-            }
-            break;
-        case SCENE_PLAY:
-            if (!PlayInit(renderer)) {
-                return false;
-            }
-            break;
-        case SCENE_LOBBY:
-            if (!LobbyInit(renderer)) {
                 return false;
             }
             break;
@@ -1702,12 +1683,6 @@ void LECleanupScene(void) {
         case SCENE_OPTIONS:
             OptionsCleanup();
             break;
-        case SCENE_PLAY:
-            PlayCleanup();
-            break;
-        case SCENE_LOBBY:
-            LobbyCleanup();
-            break;
         case SCENE3D_INTRO:
             IntroCleanup();
             break;
@@ -1766,73 +1741,15 @@ bool LEStepRender(void) {
             LEScreenHeight = event.window.data2;
 
             window_resized = true;
-        } else if (event.type == SDL_EVENT_KEY_DOWN) {
-            /* start moving in the direction we want */
-            enum MovementDirection direction = NETGetDirection();
-            switch (event.key.scancode) {
-                case SDL_SCANCODE_W:
-                    direction |= MOVEMENT_FORWARD;
-                    break;
-                case SDL_SCANCODE_A:
-                    direction |= MOVEMENT_LEFT;
-                    break;
-                case SDL_SCANCODE_S:
-                    direction |= MOVEMENT_BACKWARD;
-                    break;
-                case SDL_SCANCODE_D:
-                    direction |= MOVEMENT_RIGHT;
-                    break;
-                case SDL_SCANCODE_TAB:
-                    Navigate(event.key.mod & SDL_KMOD_SHIFT);
-                    break;
-                case SDL_SCANCODE_SPACE:
-                case SDL_SCANCODE_RETURN:
-                    PressActiveButton();
-                    break;
-                default:;
-            }
-
-            NETChangeMovement(direction);
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
             LEMouseRelX += event.motion.xrel * options.cam_sens;
             LEMouseRelY += event.motion.yrel * options.cam_sens;
-        } else if (event.type == SDL_EVENT_KEY_UP) {
-            /* stop moving in the direction */
-            enum MovementDirection direction = NETGetDirection();
-            switch (event.key.scancode) {
-                case SDL_SCANCODE_W:
-                    direction &= ~MOVEMENT_FORWARD;
-                    break;
-                case SDL_SCANCODE_A:
-                    direction &= ~MOVEMENT_LEFT;
-                    break;
-                case SDL_SCANCODE_S:
-                    direction &= ~MOVEMENT_BACKWARD;
-                    break;
-                case SDL_SCANCODE_D:
-                    direction &= ~MOVEMENT_RIGHT;
-                    break;
-                default:;
-            }
-
-            NETChangeMovement(direction);
         }
     }
 
     if (window_resized && !InitGPURenderTexture()) {
         return false;
-    }
-
-    while (time_since_network_tick >= 1.0/NETWORKING_TICKRATE) {
-        if (!SRPollConnections()) {
-            return false;
-        }
-    
-        NETTickServer();
-        NETTickClient();
-
-        time_since_network_tick -= 1.0/NETWORKING_TICKRATE;
     }
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -1847,16 +1764,6 @@ bool LEStepRender(void) {
             break;
         case SCENE_OPTIONS:
             if (!OptionsRender()) {
-                return false;
-            }
-            break;
-        case SCENE_PLAY:
-            if (!PlayRender()) {
-                return false;
-            }
-            break;
-        case SCENE_LOBBY:
-            if (!LobbyRender()) {
                 return false;
             }
             break;

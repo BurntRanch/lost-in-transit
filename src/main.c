@@ -1,7 +1,6 @@
 #include "engine.h"
 #include "scenes.h"
 #include "options.h"
-#include "steam.hh"
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_hints.h>
@@ -15,7 +14,7 @@ int main() {
     /* Initializes the options with default values (or whatever's in the config file (WIP)) */
     InitOptions();
 
-    if (!LEInitWindow() || !LEInitTTF() || !LEInitSteam())
+    if (!LEInitWindow() || !LEInitTTF())
         return 1;
 
     pLEGameFont = TTF_OpenFont("AdwaitaMono-Regular.ttf", 24);
@@ -38,8 +37,6 @@ int main() {
     LECleanupScene();
     LEDestroyGPU();
     LEDestroyWindow();
-    SRStopServer();
-    SRDisconnectFromServer();
     TTF_Quit();
     SDL_Quit();
 

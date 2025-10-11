@@ -6,8 +6,6 @@ enum {
     SCENE_NONE,
     SCENE_MAINMENU,
     SCENE_OPTIONS,
-    SCENE_PLAY,
-    SCENE_LOBBY,
     SCENE3D_INTRO,
 };
 

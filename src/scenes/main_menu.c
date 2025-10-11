@@ -48,7 +48,7 @@ static struct LE_RenderElement exit_element;
 static struct LE_Button exit_button;
 
 static inline void PlayButtonPressed() {
-    LEScheduleLoadScene(SCENE_PLAY);
+    LEScheduleLoadScene(SCENE3D_INTRO);
 }
 
 static inline void OptionsButtonPressed() {
