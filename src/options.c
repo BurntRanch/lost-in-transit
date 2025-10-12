@@ -14,7 +14,7 @@ static void error(const char *msg) {
   exit(1);
 }
 
-void OverWriteConfigFile() {
+void OverWriteConfigFile(void) {
     SDL_IOStream *stream = SDL_IOFromFile(PATH, "w");
     if (!stream)
         return;
@@ -26,7 +26,7 @@ void OverWriteConfigFile() {
     SDL_CloseIO(stream);
 }
 
-void InitOptions() {
+void InitOptions(void) {
     options.vsync = true;
     options.cam_sens = 0.5f;
 

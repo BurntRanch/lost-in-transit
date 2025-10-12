@@ -27,7 +27,7 @@ struct LE_Button {
     struct SDL_Color inactive_color_mod;
 
     /* If this is NULL, ButtonStep will return false on press. */
-    void (*on_button_pressed)();
+    void (*on_button_pressed)(void);
 };
 
 /* Initialize an LE_Button struct with default values. Please call this first.
@@ -39,15 +39,15 @@ void InitButton(struct LE_Button *const pLEButton);
 void Navigate(bool backward);
 
 /* Activate a button that was activated by Navigate() */
-void PressActiveButton();
+void PressActiveButton(void);
 
 /* Stop highlighting the button that the user navigated to with Navigate(). Basically imitates what happens when you move your mouse. */
-void ResetNavigation();
+void ResetNavigation(void);
 
 /* Steps in the button logic. */
 bool ButtonStep(struct LE_Button *const pLEButton, const struct MouseInfo *const pMouseInfo, const double *const pDelta);
 
 /* Clears the button registry. */
-void ClearButtonRegistry();
+void ClearButtonRegistry(void);
 
 #endif

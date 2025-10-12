@@ -74,10 +74,10 @@ void LEScheduleLoadScene(const Uint8 scene);
 
 /* Prepare to render with the GPU by acquiring a command buffer, and storing it in [LECommandBuffer]. 
  * you're able to (and encouraged to) import scenes after calling this function but BEFORE calling LEStartGPURender */
-bool LEPrepareGPURendering();
+bool LEPrepareGPURendering(void);
 
 /* Starts the GPU Render pass. Don't import scenes and stuff while this is active. There's no LEStopGPURender function because it only ends at LEFinishGPURendering */
-bool LEStartGPURender();
+bool LEStartGPURender(void);
 
 /* Imports a GLTF 2.0 file as a Scene3D.
  * filename isn't sanitized
@@ -91,7 +91,7 @@ struct Object *LEGetSceneObjects(const struct Scene3D * const pScene3D, size_t *
 
 /* gets a pointer to the render info, which persists across LERenderScene3D calls.
  * feel free to modify, but don't free. */
-struct RenderInfo *LEGetRenderInfo();
+struct RenderInfo *LEGetRenderInfo(void);
 
 /* Renders a Scene3D.
  * You must make sure you call LEStartGPURendering before this function.
@@ -101,7 +101,7 @@ struct RenderInfo *LEGetRenderInfo();
 bool LERenderScene3D(struct Scene3D *pScene3D);
 
 /* Submit the command buffer and present the resulting texture to the renderer. */
-bool LEFinishGPURendering();
+bool LEFinishGPURendering(void);
 
 void LEDestroyScene3D(struct Scene3D *pScene3D);
 

@@ -8,7 +8,7 @@ extern struct Options_t {
     float cam_sens;
 } options;
 
-void InitOptions();
-void OverWriteConfigFile();
+void InitOptions(void);
+void OverWriteConfigFile(void);
 
 #endif // !_OPTIONS_H_

@@ -72,11 +72,11 @@ void Navigate(bool backward) {
     (selected_button = button_registry[selected_button_idx])->force_hovered = true;
 }
 
-void PressActiveButton() {
+void PressActiveButton(void) {
     selected_button_pressed = true;
 }
 
-void ResetNavigation() {
+void ResetNavigation(void) {
     selected_button_idx = -1;
 
     if (selected_button) {
@@ -120,7 +120,7 @@ bool ButtonStep(struct LE_Button *const pLEButton, const struct MouseInfo *const
     return true;
 }
 
-void ClearButtonRegistry() {
+void ClearButtonRegistry(void) {
     button_registry_count = 0;
     ResetNavigation();
 }

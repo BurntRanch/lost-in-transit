@@ -207,7 +207,7 @@ static SDL_GPUGraphicsPipeline *textured_test_pipeline = NULL;
 static struct SDL_GPURenderPass *render_pass = NULL;
 static struct RenderInfo render_info;
 
-static bool InitGPURenderTexture() {
+static bool InitGPURenderTexture(void) {
     if (LESwapchainTexture) {
         SDL_ReleaseGPUTexture(gpu_device, LESwapchainTexture);
         LESwapchainTexture = NULL;
@@ -389,7 +389,7 @@ bool UpdateText(struct LE_Label *const pLEText) {
 /* What's the currently loaded scene? Refer to scenes.h for values */
 static Uint8 scene_loaded = SCENE_NONE;
 
-bool LEPrepareGPURendering() {
+bool LEPrepareGPURendering(void) {
     if (!(LECommandBuffer = SDL_AcquireGPUCommandBuffer(gpu_device))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to acquire command buffer for GPU device! (SDL Error: %s)\n", SDL_GetError());
         return false;
@@ -400,7 +400,7 @@ bool LEPrepareGPURendering() {
     return true;
 }
 
-bool LEStartGPURender() {
+bool LEStartGPURender(void) {
     static SDL_GPUColorTargetInfo color_target_info;
     color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};
     color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
@@ -428,7 +428,7 @@ bool LEStartGPURender() {
     return true;
 }
 
-bool LEFinishGPURendering() {
+bool LEFinishGPURendering(void) {
     if (!LECommandBuffer) {
         return false;
     }
@@ -752,7 +752,7 @@ static inline bool LoadShader(const char *fileName, Uint8 **ppBufferOut, size_t 
     return true;
 }
 
-static inline bool InitTexturedTestPipeline() {
+static inline bool InitTexturedTestPipeline(void) {
     static SDL_GPUShaderCreateInfo vertex_shader_create_info, fragment_shader_create_info;
 
     vertex_shader_create_info.code = NULL;
@@ -885,7 +885,7 @@ static inline bool InitTexturedTestPipeline() {
     return true;
 }
 
-static inline bool InitUntexturedTestPipeline() {
+static inline bool InitUntexturedTestPipeline(void) {
     static SDL_GPUShaderCreateInfo vertex_shader_create_info, fragment_shader_create_info;
 
     vertex_shader_create_info.code = NULL;
@@ -1451,7 +1451,7 @@ struct Object *LEGetSceneObjects(const struct Scene3D * const pScene3D, size_t *
     return pScene3D->objects;
 }
 
-struct RenderInfo *LEGetRenderInfo() {
+struct RenderInfo *LEGetRenderInfo(void) {
     return &render_info;
 }
 
@@ -1690,13 +1690,13 @@ void LECleanupScene(void) {
     }
 }
 
-void LEGrabMouse() {
+void LEGrabMouse(void) {
     if (!SDL_SetWindowRelativeMouseMode(window, true)) {
         SDL_LogError(SDL_LOG_CATEGORY_INPUT, "Failed to grab mouse! SDL Error: '%s'.\n", SDL_GetError());
     }
 }
 
-void LEReleaseMouse() {
+void LEReleaseMouse(void) {
     if (!SDL_SetWindowRelativeMouseMode(window, false)) {
         SDL_LogError(SDL_LOG_CATEGORY_INPUT, "Failed to release mouse! SDL Error: '%s'.\n", SDL_GetError());
     }

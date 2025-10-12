@@ -79,11 +79,10 @@ jobs:
       - name: Make Release
         run: |
           mv build/release/game lit-game
-          mkdir lib
+          mkdir -p lib/
           ldd ./lit-game | awk '{print $3}' | xargs -i cp {} ./lib
           rm -f lib/{libc.so*,ld-linux-*,libgcc_s.so*,libstdc++.so*,libm.so*}
-          echo "#!/usr/bin/sh" > start-game-linux.sh
-          tar -zcf lost-in-transit.tar.gz lit-game lib models shaders images AdwaitaMono-Regular.ttf
+          tar -zcf lost-in-transit.tar.gz lit-game lib/ models/ shaders/ images/ AdwaitaMono-Regular.ttf
 
       - name: Upload to github artifacts
         uses: actions/upload-artifact@v4
@@ -174,7 +173,6 @@ jobs:
       - name: Build project
         shell: msys2 {0}
         run: |
-          sed -i 's/check_symbol_exists(EVP_MD_CTX_free openssl\/evp.h OPENSSL_NEW_ENOUGH)/set(OPENSSL_NEW_ENOUGH TRUE)/' GameNetworkingSockets/CMakeLists.txt
           make all CSTD=c17 CXXSTD=c++17 DEBUG=0
 
       - name: Make Release

@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-int main() {
+int main(void) {
     /* Initializes the options with default values (or whatever's in the config file (WIP)) */
     InitOptions();
 

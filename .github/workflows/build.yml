@@ -160,7 +160,6 @@ jobs:
       - name: Build project
         shell: msys2 {0}
         run: |
-          sed -i 's/check_symbol_exists(EVP_MD_CTX_free openssl\/evp.h OPENSSL_NEW_ENOUGH)/set(OPENSSL_NEW_ENOUGH TRUE)/' GameNetworkingSockets/CMakeLists.txt
           make all CSTD=c17 CXXSTD=c++17
 
       - name: Make Release
