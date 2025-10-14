@@ -207,6 +207,14 @@ static SDL_GPUGraphicsPipeline *textured_test_pipeline = NULL;
 static struct SDL_GPURenderPass *render_pass = NULL;
 static struct RenderInfo render_info;
 
+static struct SceneTransition {
+    enum Scene dest;
+    /* how far we're in the transition */
+    float perc;
+
+    bool active;
+} scene_transition;
+
 static bool InitGPURenderTexture(void) {
     if (LESwapchainTexture) {
         SDL_ReleaseGPUTexture(gpu_device, LESwapchainTexture);
@@ -312,6 +320,10 @@ void LEDestroyWindow(void) {
     }
 }
 
+void LEApplySettings(void) {
+    SDL_SetRenderVSync(renderer, options.vsync ? SDL_RENDERER_VSYNC_ADAPTIVE : SDL_RENDERER_VSYNC_DISABLED);
+}
+
 bool LEInitWindow(void) {
     LEDestroyWindow();
 
@@ -319,12 +331,6 @@ bool LEInitWindow(void) {
 
     if (LECommandBuffer) {
         LECommandBuffer = NULL;
-    }
-
-    if (options.vsync) {
-        SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
-    } else {
-        SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
     }
 
     if (!(window = SDL_CreateWindow(TITLE, LEScreenWidth, LEScreenHeight, SDL_WINDOW_VULKAN))) {
@@ -337,6 +343,7 @@ bool LEInitWindow(void) {
         SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Something went wrong while getting the renderer! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     if (!gpu_device && !(gpu_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, NULL))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create GPU Device! (SDL Error: %s)\n", SDL_GetError());
@@ -346,6 +353,8 @@ bool LEInitWindow(void) {
     if (!InitGPURenderTexture()) {
         return false;
     }
+
+    LEApplySettings();
 
     return true;
 }
@@ -387,7 +396,7 @@ bool UpdateText(struct LE_Label *const pLEText) {
 }
 
 /* What's the currently loaded scene? Refer to scenes.h for values */
-static Uint8 scene_loaded = SCENE_NONE;
+static enum Scene scene_loaded = SCENE_NONE;
 
 bool LEPrepareGPURendering(void) {
     if (!(LECommandBuffer = SDL_AcquireGPUCommandBuffer(gpu_device))) {
@@ -501,15 +510,8 @@ bool LEFinishGPURendering(void) {
     return true;
 }
 
-bool LELoadScene(const Uint8 scene) {
-    if (!TTF_WasInit()) {
-        fprintf(stderr, "Can't load scene when TTF is not initialized!");
-        return false;
-    }
-
-    LECleanupScene();
-
-    switch (scene) {
+bool InitCurrentScene() {
+    switch (scene_loaded) {
         case SCENE_MAINMENU:
             if (!MainMenuInit(renderer)) {
                 return false;
@@ -528,14 +530,13 @@ bool LELoadScene(const Uint8 scene) {
         default:;
     }
 
-    scene_loaded = scene;
     return true;
 }
 
-static Uint8 scene_to_load = SCENE_UNKNOWN;
-
-void LEScheduleLoadScene(const Uint8 scene) {
-    scene_to_load = scene;
+void LELoadScene(const Uint8 scene) {
+    scene_transition.dest = scene;
+    scene_transition.perc = 0.f;
+    scene_transition.active = true;
 }
 
 static void aiVector3ToVec3(struct aiVector3D *src, float *dst) {
@@ -1716,15 +1717,6 @@ Uint32 LESwapchainWidth, LESwapchainHeight = 0;
 bool LEStepRender(void) {
     now = SDL_GetTicksNS();
 
-    /* Load scheduled scenes (if any) */
-    if (scene_to_load != SCENE_UNKNOWN) {
-        if (!LELoadScene(scene_to_load)) {
-            return false;
-        }
-
-        scene_to_load = SCENE_UNKNOWN;
-    }
-
     static SDL_Event event;
 
     LEMouseRelX = 0;
@@ -1736,7 +1728,19 @@ bool LEStepRender(void) {
         /* If escape is held down OR a window close is requested, return false. */
         if (event.type == SDL_EVENT_QUIT) {
             return false;
-        } else if (event.type == SDL_EVENT_KEY_DOWN) {
+        } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+            LEScreenWidth = event.window.data1;
+            LEScreenHeight = event.window.data2;
+
+            window_resized = true;
+        }
+
+        /* If we're in the middle of a transition, don't handle any event. (except the 2 aforementioned) */
+        if (scene_transition.active) {
+            continue;
+        }
+
+        if (event.type == SDL_EVENT_KEY_DOWN) {
             switch (event.key.scancode) {
                 case SDL_SCANCODE_ESCAPE:
                     return false;
@@ -1761,11 +1765,6 @@ bool LEStepRender(void) {
                 default:
                     ;
             }
-        } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-            LEScreenWidth = event.window.data1;
-            LEScreenHeight = event.window.data2;
-
-            window_resized = true;
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
             LEMouseRelX += event.motion.xrel * options.cam_sens;
@@ -1777,27 +1776,49 @@ bool LEStepRender(void) {
         return false;
     }
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(renderer);
+        SDL_SetRenderDrawColorFloat(renderer, 0.f, 0.f, 0.f, SDL_ALPHA_OPAQUE_FLOAT);
+        SDL_RenderClear(renderer);
 
-    /* call the right render function for whatever scene we're running right now */
-    switch (scene_loaded) {
-        case SCENE_MAINMENU:
-            if (!MainMenuRender()) {
+        /* call the right render function for whatever scene we're running right now */
+        switch (scene_loaded) {
+            case SCENE_MAINMENU:
+                if (!MainMenuRender()) {
+                    return false;
+                }
+                break;
+            case SCENE_OPTIONS:
+                if (!OptionsRender()) {
+                    return false;
+                }
+                break;
+            case SCENE3D_INTRO:
+                if (!IntroRender()) {
+                    return false;
+                }
+                break;
+            default:;
+        }
+    if (scene_transition.active) {
+        scene_transition.perc += LEFrametime * 0.5f;
+        if (scene_transition.dest != scene_loaded && scene_transition.perc >= 0.5f) {
+            LECleanupScene();
+            scene_loaded = scene_transition.dest;
+            if (!InitCurrentScene()) {
                 return false;
             }
-            break;
-        case SCENE_OPTIONS:
-            if (!OptionsRender()) {
-                return false;
-            }
-            break;
-        case SCENE3D_INTRO:
-            if (!IntroRender()) {
-                return false;
-            }
-            break;
-        default:;
+        }
+        if (scene_transition.perc >= 1.f) {
+            scene_transition.perc = 1.f;
+            scene_transition.active = false;
+        }
+
+        if (scene_transition.perc <= 0.5f) {
+            SDL_SetRenderDrawColorFloat(renderer, 0.f, 0.f, 0.f, scene_transition.perc*2);
+        } else {
+            /* flip scene_transition.perc from (0.5->1.0) to (1.0->0.0) */
+            SDL_SetRenderDrawColorFloat(renderer, 0.f, 0.f, 0.f, -((scene_transition.perc-1.f)*2));
+        }
+        SDL_RenderFillRect(renderer, NULL);
     }
 
     SDL_RenderPresent(renderer);

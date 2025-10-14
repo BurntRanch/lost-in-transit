@@ -48,11 +48,11 @@ static struct LE_RenderElement exit_element;
 static struct LE_Button exit_button;
 
 static inline void PlayButtonPressed() {
-    LEScheduleLoadScene(SCENE3D_INTRO);
+    LELoadScene(SCENE3D_INTRO);
 }
 
 static inline void OptionsButtonPressed() {
-    LEScheduleLoadScene(SCENE_OPTIONS);
+    LELoadScene(SCENE_OPTIONS);
 }
 
 bool MainMenuInit(SDL_Renderer *pRenderer) {
@@ -63,16 +63,14 @@ bool MainMenuInit(SDL_Renderer *pRenderer) {
         return false;
     }
 
-    title_label.text = SDL_malloc(256);
-    SDL_memcpy(title_label.text, "Lost in Transit", 16);
+    title_label.text = "Lost in Transit";
     if (!UpdateText(&title_label)) {
         return false;
     }
     title_dstrect.w = title_label.surface->w;
     title_dstrect.h = title_label.surface->h;
 
-    version_title_label.text = SDL_malloc(32);
-    SDL_memcpy(version_title_label.text, "v"LIT_VERSION, 16);
+    version_title_label.text = "v"LIT_VERSION;
     if (!UpdateText(&version_title_label)) {
         return false;
     }

@@ -1,7 +1,7 @@
 #ifndef SCENES_H
 #define SCENES_H
 
-enum {
+enum Scene {
     SCENE_UNKNOWN = 0,
     SCENE_NONE,
     SCENE_MAINMENU,

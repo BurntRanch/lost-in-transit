@@ -1,6 +1,6 @@
 #include "engine.h"
-#include "scenes.h"
 #include "options.h"
+#include "scenes.h"
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_hints.h>
@@ -23,12 +23,11 @@ int main(void) {
         return 1;
     }
 
-    if (!LELoadScene(SCENE_MAINMENU))
-        return 1;
+    LELoadScene(SCENE_MAINMENU);
 
     // double frametime;
     while (LEStepRender()) {
-        // printf("frametime: %fms (%ld FPS)\n", LEFrametime * 1000, SDL_lround(1 / LEFrametime));
+        printf("frametime: %fms (%ld FPS)\n", LEFrametime * 1000, SDL_lround(1 / LEFrametime));
     }
 
     TTF_CloseFont(pLEGameFont);

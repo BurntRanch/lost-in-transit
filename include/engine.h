@@ -50,27 +50,18 @@ struct RenderInfo {
     SDL_GPUViewport viewport;
 };
 
+/* Apply settings, this doesn't need to be called except when you change a setting. */
+void LEApplySettings(void);
 /* Returns true on success. */
 bool LEInitWindow(void);
 /* Returns true on success. */
 bool LEInitTTF(void);
 
-/* Loads a scene **immediately**, This is not safe to run multi-threaded or inside of a scenes render function. Consider calling LEScheduleLoadScene for that purpose instead.
+/* Transitions to a different scene.
  * Refer to scenes.h
  * Returns true on success.
  */
-bool LELoadScene(const Uint8 scene);
-
-/* Schedules a scene load. Refer to scenes.h
- *
- * The scene load will not take effect instantly. It will take effect at the start of the next frame.
- * Useful if a scene wants to safely change scenes during its render function.
- *
- * Only one scene load can take place at a time. The last call to this function will take precedence.
- *
- * Returns true on success.
- */
-void LEScheduleLoadScene(const Uint8 scene);
+void LELoadScene(const Uint8 scene);
 
 /* Prepare to render with the GPU by acquiring a command buffer, and storing it in [LECommandBuffer]. 
  * you're able to (and encouraged to) import scenes after calling this function but BEFORE calling LEStartGPURender */

@@ -38,7 +38,7 @@ static struct LE_RenderElement back_element;
 static struct LE_Button back_button;
 
 static inline void BackButtonPressed() {
-    LEScheduleLoadScene(SCENE_MAINMENU);
+    LELoadScene(SCENE_MAINMENU);
 }
 
 const char *checkbox_image;
@@ -198,5 +198,5 @@ void OptionsCleanup(void) {
     DestroyText(&option_vsync_label);
 
     OverWriteConfigFile();
-    LEInitWindow();
+    LEApplySettings();
 }
