@@ -1799,7 +1799,7 @@ bool LEStepRender(void) {
             default:;
         }
     if (scene_transition.active) {
-        scene_transition.perc += LEFrametime * 0.5f;
+        scene_transition.perc += LEFrametime;
         if (scene_transition.dest != scene_loaded && scene_transition.perc >= 0.5f) {
             LECleanupScene();
             scene_loaded = scene_transition.dest;
