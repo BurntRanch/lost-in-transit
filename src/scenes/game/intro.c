@@ -1,5 +1,6 @@
 #include "scenes/game/intro.h"
 #include "engine.h"
+#include "model.h"
 #include <SDL3/SDL_assert.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_gpu.h>
@@ -37,7 +38,7 @@
 
 static SDL_GPUDevice *gpu_device = NULL;
 
-static struct Scene3D *intro_scene = NULL;
+static struct Model *intro_scene = NULL;
 
 static float camera_pitch, camera_yaw = 0;
 static vec4 camera_rotation;
@@ -76,7 +77,7 @@ bool IntroRender(void) {
 
     /* initialize scene if not initialized, exit on failure */
     if (!intro_scene) {
-        if (!(intro_scene = LEImportScene3D("models/test.glb")) || !LEFinishGPURendering()) {
+        if (!(intro_scene = MLImportModel("models/test.glb")) || !LEFinishGPURendering()) {
             return false;
         }
         return true;
@@ -101,7 +102,7 @@ bool IntroRender(void) {
     glm_quat_rotatev(camera_rotation, player_direction, dir);
     glm_vec3_muladds(dir, LEFrametime, render_info->cam_pos);
 
-    if (!LERenderScene3D(intro_scene)) {
+    if (!LERenderModel(intro_scene)) {
         return false;
     }
 
@@ -148,6 +149,8 @@ void IntroKeyUp(SDL_Scancode scancode) {
 void IntroCleanup(void) {
     LEReleaseMouse();
 
-    LEDestroyScene3D(intro_scene);
-    intro_scene = NULL;
+    if (intro_scene) {
+        MLDestroyModel(intro_scene);
+        intro_scene = NULL;
+    }
 }
