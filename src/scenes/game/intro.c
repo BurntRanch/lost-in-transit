@@ -88,8 +88,8 @@ bool IntroRender(void) {
         return false;
     }
 
-    camera_pitch = SDL_min(SDL_max(camera_pitch + -LEMouseRelY * LEFrametime, -1.15f), 0.8f);
-    camera_yaw = SDL_fmodf(camera_yaw + -LEMouseRelX * LEFrametime, 6.28f);
+    camera_pitch = SDL_min(SDL_max(camera_pitch + -(LEMouseRelY / LEScreenHeight), -1.15f), 0.8f);
+    camera_yaw = SDL_fmodf(camera_yaw + -(LEMouseRelX / LEScreenWidth), 6.28f);
 
     render_info->dir_vec[0] = 1.0f;
     render_info->dir_vec[1] = 0.0f;
