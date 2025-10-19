@@ -30,9 +30,8 @@ LDLIBS		+= $(BUILDDIR)/libassimp.a $(shell pkg-config --libs-only-l sdl3 sdl3-tt
 CFLAGS		+= -fvisibility=hidden -Iinclude -Iexternal/assimp/include -Iinclude/cglm -std=$(CSTD) $(VARS) $(shell pkg-config --cflags sdl3 sdl3-ttf sdl3-image) -DLIT_VERSION=\"$(VERSION)\"
 
 SHADER_DIR 	 = shaders
-SHADERS 	 = $(wildcard $(SHADER_DIR)/untextured/*.vert $(SHADER_DIR)/untextured/*.frag $(SHADER_DIR)/textured/*.vert $(SHADER_DIR)/textured/*.frag)
-SPV 		 = $(SHADERS:.vert=.vert.spv)
-SPV 		:= $(SPV:.frag=.frag.spv)
+VERT_SHADERS = $(wildcard $(SHADER_DIR)/vertex/*.glsl)
+FRAG_SHADERS 	 = $(wildcard $(SHADER_DIR)/untextured/*.glsl $(SHADER_DIR)/textured/*.glsl)
 
 # This is an hacky ugly bastard way to check if we're not in windows
 # just to add UBSAN
@@ -77,6 +76,7 @@ clean:
 	rm -rf $(BUILDDIR)/$(TARGET) $(OBJ)
 
 shaders:
-	for f in $(SHADERS); do $(GLSLC) -I shaders/ $$f -o $$f.spv; done
+	for f in $(VERT_SHADERS); do $(GLSLC) -I shaders/ -fshader-stage=vert $$f -o $$f.spv; done
+	for f in $(FRAG_SHADERS); do $(GLSLC) -I shaders/ -fshader-stage=frag $$f -o $$f.spv; done
 
 .PHONY: $(TARGET) clean assimp shaders all

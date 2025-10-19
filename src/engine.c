@@ -767,7 +767,7 @@ static inline bool InitTexturedTestPipeline(void) {
     vertex_shader_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     vertex_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/textured/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/vertex/vertex.glsl.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
         return false;
     }
 
@@ -782,7 +782,7 @@ static inline bool InitTexturedTestPipeline(void) {
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/textured/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/textured/test_shader.glsl.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
         return false;
     }
 
@@ -900,7 +900,7 @@ static inline bool InitUntexturedTestPipeline(void) {
     vertex_shader_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     vertex_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/untextured/test_shader.vert.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/vertex/vertex.glsl.spv", (Uint8 **)&vertex_shader_create_info.code, &vertex_shader_create_info.code_size)) {
         return false;
     }
 
@@ -915,7 +915,7 @@ static inline bool InitUntexturedTestPipeline(void) {
     fragment_shader_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_shader_create_info.props = 0;
 
-    if (!LoadShader("shaders/untextured/test_shader.frag.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
+    if (!LoadShader("shaders/untextured/test_shader.glsl.spv", (Uint8 **)&fragment_shader_create_info.code, &fragment_shader_create_info.code_size)) {
         return false;
     }
 
@@ -1767,6 +1767,8 @@ bool LEStepRender(void) {
             }
         } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
             ResetNavigation();
+
+            /* arbitrary number, freely changable but make sure it's the same across both */
             LEMouseRelX += event.motion.xrel * options.cam_sens;
             LEMouseRelY += event.motion.yrel * options.cam_sens;
         }

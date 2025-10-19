@@ -1,6 +1,7 @@
 #version 450
 
 layout(location = 0) in vec3 vert_pos;
+layout(location = 1) in vec2 vert_uv;
 layout(location = 2) in vec3 vert_norm;
 layout(location = 3) in ivec4 bone_ids;
 layout(location = 4) in vec4 weights;
@@ -14,6 +15,7 @@ layout(std140, set = 1, binding = 0) uniform matrices {
 
 layout(location = 0) out vec3 FragPos;
 layout(location = 1) out vec3 Normal;
+layout(location = 2) out vec2 uv;
 
 void main() {
     mat4 bone_mat = mat4(0.0f);
@@ -30,6 +32,7 @@ void main() {
     }
 
     gl_Position = mats.projection * mats.view * mats.model * bone_mat * vec4(vert_pos, 1.0f);
+    uv = vert_uv;
     FragPos = vec3(mats.model * bone_mat * vec4(vert_pos, 1.0f));
     Normal = vert_norm;
 }
