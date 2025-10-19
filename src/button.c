@@ -86,13 +86,17 @@ void ResetNavigation(void) {
 }
 
 bool ButtonStep(struct LE_Button *const pLEButton, const struct MouseInfo *const pMouseInfo, const double *const pDelta) {
+    if (!pLEButton) {
+        return false;
+    }
+
     if (!activate_button_if_hovering(pMouseInfo->x, pMouseInfo->y,
                                      pMouseInfo->state & SDL_BUTTON_LMASK,
                                      &pLEButton->element->dstrect,
                                      &pLEButton->hovered, &pLEButton->held, pLEButton->on_button_pressed))
         return false;
 
-    if (selected_button_pressed && selected_button) {
+    if (selected_button_pressed && selected_button == pLEButton) {
         selected_button_pressed = false;
         if (selected_button->on_button_pressed) {
             selected_button->on_button_pressed();
