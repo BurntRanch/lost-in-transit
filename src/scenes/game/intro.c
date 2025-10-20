@@ -83,8 +83,8 @@ bool IntroRender(void) {
         return true;
     }
 
-    render_info->viewport.w = LESwapchainWidth;
-    render_info->viewport.h = LESwapchainHeight;
+    render_info->viewport.w = LEScreenWidth;
+    render_info->viewport.h = LEScreenHeight;
     if (!LEStartGPURender()) {
         return false;
     }

@@ -638,7 +638,7 @@ struct Model *MLImportModel(const char * const filename) {
         aiVector3ToVec3(&specular, MLLightUBO.lights[MLLightUBO.lights_count].specular);
         aiVector3ToVec3(&ambient, MLLightUBO.lights[MLLightUBO.lights_count].ambient);
 
-        MLLightUBO.lights[MLLightUBO.lights_count].scene_ptr = (Uint64)model;
+        MLLightUBO.lights[MLLightUBO.lights_count].model_ptr = (Uint64)model;
 
         MLLightUBO.lights_count++;
         SDL_assert(MLLightUBO.lights_count < 256);
@@ -693,7 +693,7 @@ void MLDestroyModel(struct Model *pModel) {
     /* loop through the lights and remove any lights imported from this scene */
     int i;
     for (i = 0; i < MLLightUBO.lights_count;) {
-        if (MLLightUBO.lights[i].scene_ptr != (Uint64)pModel) {
+        if (MLLightUBO.lights[i].model_ptr != (Uint64)pModel) {
             i++;
             continue;
         }

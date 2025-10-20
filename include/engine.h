@@ -19,10 +19,9 @@ extern float LEMouseRelX, LEMouseRelY;
 
 extern double LEFrametime;
 
-/* Only used in 3D accelerated scenes. */
 extern SDL_GPUCommandBuffer *LECommandBuffer;
-extern SDL_GPUTexture *LESwapchainTexture, *LEDepthStencilTexture;
-extern Uint32 LESwapchainWidth, LESwapchainHeight;
+// extern SDL_GPUTexture *LESwapchainTexture, *LEDepthStencilTexture;
+// extern Uint32 LESwapchainWidth, LESwapchainHeight;
 
 struct RenderInfo {
     /* Where is the camera? */

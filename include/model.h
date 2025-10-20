@@ -148,7 +148,8 @@ struct Light {
     vec3 ambient;
     float pad4;
 
-    Uint64 scene_ptr;
+    /* Only use for comparison, don't dereference! */
+    Uint64 model_ptr;
 };
 
 struct LightUBO {
@@ -158,6 +159,7 @@ struct LightUBO {
     struct Light lights[256]; // starts at 16 bytes
 };
 
+/* you can use this to access light info, but keep in mind lights are shared across models (you can check with the model_ptr in each Light struct). */
 extern struct LightUBO MLLightUBO;
 
 /* Imports a GLTF 2.0 file as a Model.

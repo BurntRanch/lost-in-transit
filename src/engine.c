@@ -33,11 +33,12 @@
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_stdinc.h>
-
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <stdio.h>
 #include <time.h>
+
+#define IN_FLIGHT_FRAMES 2 
 
 alignas(16) static struct MatricesUBO {
     mat4 model;
@@ -60,11 +61,19 @@ SDL_GPUCommandBuffer *LECommandBuffer = NULL;
 
 static SDL_Texture *render_texture = NULL;
 
-/* we keep this open because why should we keep opening/closing it each frame? */
-static SDL_GPUTransferBuffer *render_transferbuffer = NULL;
-
-static struct SDL_GPURenderPass *render_pass = NULL;
+static SDL_GPURenderPass *render_pass = NULL;
 static struct RenderInfo render_info;
+
+static struct FlightFrame {
+    SDL_GPUTexture *render_target;
+    SDL_GPUTexture *depth_stencil_target;
+
+    SDL_GPUTransferBuffer *render_transferbuffer;
+
+    SDL_GPUFence *fence;
+} swapchain_textures[IN_FLIGHT_FRAMES];
+
+static size_t active_frame = 0;
 
 static struct SceneTransition {
     enum Scene dest;
@@ -74,33 +83,43 @@ static struct SceneTransition {
     bool active;
 } scene_transition;
 
-static bool InitGPURenderTexture(void) {
-    if (LESwapchainTexture) {
-        SDL_ReleaseGPUTexture(gpu_device, LESwapchainTexture);
-        LESwapchainTexture = NULL;
-    }
-
-    if (LEDepthStencilTexture) {
-        SDL_ReleaseGPUTexture(gpu_device, LEDepthStencilTexture);
-        LEDepthStencilTexture = NULL;
-    }
-
-    if (render_transferbuffer) {
-        SDL_ReleaseGPUTransferBuffer(gpu_device, render_transferbuffer);
-        render_transferbuffer = NULL;
-    }
-
-    if (render_texture) {
+/* works even if gpu_device is NULL */
+void FreeGPUResources() {
+    if (gpu_device && render_texture) {
         SDL_DestroyTexture(render_texture);
-        render_texture = NULL;
     }
+    render_texture = NULL;
 
+    for (size_t i = 0; i < IN_FLIGHT_FRAMES; i++) {
+        if (gpu_device) {
+            if (swapchain_textures[i].render_target) {
+                SDL_ReleaseGPUTexture(gpu_device, swapchain_textures[i].render_target);
+            }
+            if (swapchain_textures[i].depth_stencil_target) {
+                SDL_ReleaseGPUTexture(gpu_device, swapchain_textures[i].depth_stencil_target);
+            }
+            if (swapchain_textures[i].fence) {
+                SDL_ReleaseGPUFence(gpu_device, swapchain_textures[i].fence);
+            }
+            if (swapchain_textures[i].render_transferbuffer) {
+                SDL_ReleaseGPUTransferBuffer(gpu_device, swapchain_textures[i].render_transferbuffer);
+            }
+        }
+
+        swapchain_textures[i].render_target = NULL;
+        swapchain_textures[i].depth_stencil_target = NULL;
+        swapchain_textures[i].fence = NULL;
+        swapchain_textures[i].render_transferbuffer = NULL;
+    }
+}
+
+static bool InitGPURenderTexture(void) {
     static SDL_GPUTextureCreateInfo gpu_texture_create_info;
     gpu_texture_create_info.type = SDL_GPU_TEXTURETYPE_2D;
     gpu_texture_create_info.props = 0;
     gpu_texture_create_info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
-    gpu_texture_create_info.width = (LESwapchainWidth = LEScreenWidth);
-    gpu_texture_create_info.height = (LESwapchainHeight = LEScreenHeight);
+    gpu_texture_create_info.width = LEScreenWidth;
+    gpu_texture_create_info.height = LEScreenHeight;
     gpu_texture_create_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
     gpu_texture_create_info.num_levels = 1;
     gpu_texture_create_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
@@ -110,35 +129,35 @@ static bool InitGPURenderTexture(void) {
     depth_stencil_texture_create_info.type = SDL_GPU_TEXTURETYPE_2D;
     depth_stencil_texture_create_info.props = 0;
     depth_stencil_texture_create_info.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
-    depth_stencil_texture_create_info.width = (LESwapchainWidth = LEScreenWidth);
-    depth_stencil_texture_create_info.height = (LESwapchainHeight = LEScreenHeight);
+    depth_stencil_texture_create_info.width = LEScreenWidth;
+    depth_stencil_texture_create_info.height = LEScreenHeight;
     depth_stencil_texture_create_info.format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
     depth_stencil_texture_create_info.num_levels = 1;
     depth_stencil_texture_create_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
     depth_stencil_texture_create_info.layer_count_or_depth = 1;
     
-    /* TODO: This keeps creating file descriptors, and doesn't close them. why? */
-    if (!(LESwapchainTexture = SDL_CreateGPUTexture(gpu_device, &gpu_texture_create_info))) {
-        fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
-        return false;
-    }
-    if (!(LEDepthStencilTexture = SDL_CreateGPUTexture(gpu_device, &depth_stencil_texture_create_info))) {
-        fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
-        return false;
-    }
-
     static SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info;
     transfer_buffer_create_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
     transfer_buffer_create_info.props = 0;
-    transfer_buffer_create_info.size = LESwapchainWidth * LESwapchainHeight * 4;  /* 4 bytes for each pixel */
+    transfer_buffer_create_info.size = LEScreenWidth * LEScreenHeight * 4;  /* 4 bytes for each pixel */
 
-    if (!(render_transferbuffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info))) {
-        fprintf(stderr, "Failed to create GPU Transfer buffer! (SDL Error: %s)\n", SDL_GetError());
-        return false;
+    for (size_t i = 0; i < IN_FLIGHT_FRAMES; i++) {
+        if (!(swapchain_textures[i].render_target = SDL_CreateGPUTexture(gpu_device, &gpu_texture_create_info))) {
+            fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
+            return false;
+        }
+        if (!(swapchain_textures[i].depth_stencil_target = SDL_CreateGPUTexture(gpu_device, &depth_stencil_texture_create_info))) {
+            fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
+            return false;
+        }
+        if (!(swapchain_textures[i].render_transferbuffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info))) {
+            fprintf(stderr, "Failed to create GPU Transfer buffer! (SDL Error: %s)\n", SDL_GetError());
+            return false;
+        }
     }
 
     /* the colors are reversed so this is effectively RGBA. Please don't ask me anything about this. */
-    if (!(render_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, LESwapchainWidth, LESwapchainHeight))) {
+    if (!(render_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, LEScreenWidth, LEScreenHeight))) {
         SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Failed to create render_texture! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
@@ -147,36 +166,24 @@ static bool InitGPURenderTexture(void) {
 }
 
 void LEDestroyGPU(void) {
-    if (!gpu_device) {
-        return;
-    }
+    FreeGPUResources();
 
-    if (LESwapchainTexture) {
-        SDL_ReleaseGPUTexture(gpu_device, LESwapchainTexture);
-        LESwapchainTexture = NULL;
+    if (gpu_device) {
+        SDL_DestroyGPUDevice(gpu_device);
     }
-    if (LEDepthStencilTexture) {
-        SDL_ReleaseGPUTexture(gpu_device, LEDepthStencilTexture);
-        LEDepthStencilTexture = NULL;
-    }
-    if (render_transferbuffer) {
-        SDL_ReleaseGPUTransferBuffer(gpu_device, render_transferbuffer);
-        render_transferbuffer = NULL;
-    }
-
-    SDL_DestroyGPUDevice(gpu_device);
     gpu_device = NULL;
 }
 
 void LEDestroyWindow(void) {
     if (window) {
         SDL_DestroyWindow(window);
-        window = NULL;
-
-        /* we have to set the other values to NULL because they're implicitly destroyed */
-        renderer = NULL;
-        render_texture = NULL;
     }
+
+    window = NULL;
+
+    /* we have to set the other values to NULL because they're implicitly destroyed */
+    renderer = NULL;
+    render_texture = NULL;
 }
 
 void LEApplySettings(void) {
@@ -185,7 +192,6 @@ void LEApplySettings(void) {
 
 bool LEInitWindow(void) {
     LEDestroyWindow();
-
     LEDestroyGPU();
 
     if (LECommandBuffer) {
@@ -439,13 +445,44 @@ SDL_GPUDevice *LEGetGPUDevice() {
     return gpu_device;
 }
 
+bool CopyFrameToRenderTexture(size_t frame) {
+    static void *pixels;
+    if (!(pixels = SDL_MapGPUTransferBuffer(gpu_device, swapchain_textures[frame].render_transferbuffer, false))) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to map GPU Transfer buffer to memory! (SDL Error: %s)\n", SDL_GetError());
+        return false;
+    }
+
+    static void *dst_pixels;
+    static int pitch;
+    
+    if (!SDL_LockTexture(render_texture, NULL, &dst_pixels, &pitch)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to lock render_texture! If this happens too often, please report this issue! (SDL Error: %s)\n", SDL_GetError()); 
+        return true;
+    }
+
+    SDL_memcpy(dst_pixels, pixels, pitch * LEScreenHeight);
+
+    SDL_UnmapGPUTransferBuffer(gpu_device, swapchain_textures[frame].render_transferbuffer);
+    SDL_UnlockTexture(render_texture);
+
+    return true;
+}
+
 bool LEStartGPURender(void) {
+    active_frame = (active_frame + 1) % (IN_FLIGHT_FRAMES);
+    
+    if (swapchain_textures[active_frame].fence) {
+        SDL_WaitForGPUFences(gpu_device, true, &swapchain_textures[active_frame].fence, 1);
+        SDL_ReleaseGPUFence(gpu_device, swapchain_textures[active_frame].fence);
+        swapchain_textures[active_frame].fence = NULL;
+    }
+
     static SDL_GPUColorTargetInfo color_target_info;
     color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};
     color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
     color_target_info.mip_level = 0;
     color_target_info.store_op = SDL_GPU_STOREOP_STORE;
-    color_target_info.texture = LESwapchainTexture;
+    color_target_info.texture = swapchain_textures[active_frame].render_target;
 
     static SDL_GPUDepthStencilTargetInfo depth_stencil_target_info;
     depth_stencil_target_info.clear_stencil = 255;
@@ -455,7 +492,7 @@ bool LEStartGPURender(void) {
     depth_stencil_target_info.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
     depth_stencil_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
     depth_stencil_target_info.store_op = SDL_GPU_STOREOP_STORE;
-    depth_stencil_target_info.texture = LEDepthStencilTexture;
+    depth_stencil_target_info.texture = swapchain_textures[active_frame].depth_stencil_target;
 
     if (!(render_pass = SDL_BeginGPURenderPass(LECommandBuffer, &color_target_info, 1, &depth_stencil_target_info))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to begin render pass! (SDL Error: %s)\n", SDL_GetError());
@@ -486,51 +523,58 @@ bool LEFinishGPURendering(void) {
     static SDL_GPUTextureRegion src;
     src.x = 0;
     src.y = 0;
-    src.w = LESwapchainWidth;
-    src.h = LESwapchainHeight;
+    src.w = LEScreenWidth;
+    src.h = LEScreenHeight;
     src.z = 0;
     src.d = 1;
     src.layer = 0;
-    src.texture = LESwapchainTexture;
+    src.texture = swapchain_textures[active_frame].render_target;
     src.mip_level = 0;
 
     static SDL_GPUTextureTransferInfo texture_transfer_info;
     texture_transfer_info.offset = 0;
-    texture_transfer_info.pixels_per_row = LESwapchainWidth;
-    texture_transfer_info.rows_per_layer = LESwapchainHeight;
-    texture_transfer_info.transfer_buffer = render_transferbuffer;
+    texture_transfer_info.pixels_per_row = LEScreenWidth;
+    texture_transfer_info.rows_per_layer = LEScreenHeight;
+    texture_transfer_info.transfer_buffer = swapchain_textures[active_frame].render_transferbuffer;
 
     SDL_DownloadFromGPUTexture(copy_pass, &src, &texture_transfer_info);
 
     SDL_EndGPUCopyPass(copy_pass);
 
-    static SDL_GPUFence *fence;
-    if (!(fence = SDL_SubmitGPUCommandBufferAndAcquireFence(LECommandBuffer))) {
+    if (!(swapchain_textures[active_frame].fence = SDL_SubmitGPUCommandBufferAndAcquireFence(LECommandBuffer))) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to submit command buffer to GPU device! (SDL Error: %s)\n", SDL_GetError());
         return false;
     }
 
-    SDL_WaitForGPUFences(gpu_device, 1, &fence, 1);
-    SDL_ReleaseGPUFence(gpu_device, fence);
+    bool found = false;
+    size_t latest_match;
+#if IN_FLIGHT_FRAMES > 1
+    for (size_t i = (active_frame + 1) % (IN_FLIGHT_FRAMES); i != active_frame; i = (i + 1) % (IN_FLIGHT_FRAMES)) {
+        /* if this frame was never rendered, skip. (only happens in the first few frames, then this should never happen.) */
+        if (!swapchain_textures[i].fence) {
+            continue;
+        }
+        /* if this swapchain texture hasn't finished rendering, break out. */
+        if (!SDL_QueryGPUFence(gpu_device, swapchain_textures[i].fence)) {
+            break;
+        }
 
-    static void *pixels;
-    if (!(pixels = SDL_MapGPUTransferBuffer(gpu_device, render_transferbuffer, false))) {
-        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to map GPU Transfer buffer to memory! (SDL Error: %s)\n", SDL_GetError());
-        return false;
+        found = true;
+        latest_match = i;
+        SDL_ReleaseGPUFence(gpu_device, swapchain_textures[i].fence);
+        swapchain_textures[i].fence = NULL;
     }
+#else
+    found = true;
+    latest_match = active_frame;
+    SDL_WaitForGPUFences(gpu_device, true, &swapchain_textures[active_frame].fence, 1);
+    SDL_ReleaseGPUFence(gpu_device, swapchain_textures[active_frame].fence);
+    swapchain_textures[active_frame].fence = NULL;
+#endif
 
-    static void *dst_pixels;
-    static int pitch;
-    
-    if (!SDL_LockTexture(render_texture, NULL, &dst_pixels, &pitch)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to lock render_texture! If this happens too often, please report this issue! (SDL Error: %s)\n", SDL_GetError()); 
-        return true;
+    if (found) {
+        CopyFrameToRenderTexture(latest_match);
     }
-
-    SDL_memcpy(dst_pixels, pixels, pitch * LESwapchainHeight);
-
-    SDL_UnmapGPUTransferBuffer(gpu_device, render_transferbuffer);
-    SDL_UnlockTexture(render_texture);
 
     if (!SDL_RenderTexture(renderer, render_texture, NULL, NULL)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to display GPU texture to screen! (SDL Error: '%s')\n", SDL_GetError());
@@ -675,7 +719,7 @@ static inline void StepAnimation(struct Model *pModel) {
 bool LERenderModel(struct Model *pScene3D) {
     StepAnimation(pScene3D);
 
-    glm_perspective(1.0472f, (float)LESwapchainWidth/(float)LESwapchainHeight, 0.1f, 1000.f, matrices.projection);
+    glm_perspective(1.0472f, (float)LEScreenWidth/(float)LEScreenHeight, 0.1f, 1000.f, matrices.projection);
     glm_look(render_info.cam_pos, render_info.dir_vec, (vec3){0, 1, 0}, matrices.view);
 
     struct Object *obj;
@@ -831,32 +875,36 @@ bool LEStepRender(void) {
         }
     }
 
-    if (window_resized && !InitGPURenderTexture()) {
-        return false;
+    if (window_resized) {
+        FreeGPUResources();
+
+        if (!InitGPURenderTexture()) {
+            return false;
+        }
     }
 
-        SDL_SetRenderDrawColorFloat(renderer, 0.f, 0.f, 0.f, SDL_ALPHA_OPAQUE_FLOAT);
-        SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColorFloat(renderer, 0.f, 0.f, 0.f, SDL_ALPHA_OPAQUE_FLOAT);
+    SDL_RenderClear(renderer);
 
-        /* call the right render function for whatever scene we're running right now */
-        switch (scene_loaded) {
-            case SCENE_MAINMENU:
-                if (!MainMenuRender()) {
-                    return false;
-                }
-                break;
-            case SCENE_OPTIONS:
-                if (!OptionsRender()) {
-                    return false;
-                }
-                break;
-            case SCENE3D_INTRO:
-                if (!IntroRender()) {
-                    return false;
-                }
-                break;
-            default:;
-        }
+    /* call the right render function for whatever scene we're running right now */
+    switch (scene_loaded) {
+        case SCENE_MAINMENU:
+            if (!MainMenuRender()) {
+                return false;
+            }
+            break;
+        case SCENE_OPTIONS:
+            if (!OptionsRender()) {
+                return false;
+            }
+            break;
+        case SCENE3D_INTRO:
+            if (!IntroRender()) {
+                return false;
+            }
+            break;
+        default:;
+    }
     if (scene_transition.active) {
         scene_transition.perc += LEFrametime;
         if (scene_transition.dest != scene_loaded && scene_transition.perc >= 0.5f) {
