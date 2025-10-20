@@ -38,6 +38,10 @@
 #include <stdio.h>
 #include <time.h>
 
+/* setting this to zero will disable in-flight frames completely (meaning immediately after submitting a command buffer, the main thread will block waiting for the frame to finish before displaying)
+ * disabling has the benefit of lower latency, but higher frametimes.
+ * keep in mind even having this as 1 instead of 0 results in lower frametimes, but it's better to pick between 0 and >=2 as latency isn't really a problem for the engines implementation..
+ * ..of in-flight frames */
 #define IN_FLIGHT_FRAMES 2 
 
 alignas(16) static struct MatricesUBO {
@@ -71,7 +75,11 @@ static struct FlightFrame {
     SDL_GPUTransferBuffer *render_transferbuffer;
 
     SDL_GPUFence *fence;
+#if IN_FLIGHT_FRAMES >= 1
 } swapchain_textures[IN_FLIGHT_FRAMES];
+#else
+} swapchain_textures[1];
+#endif
 
 static size_t active_frame = 0;
 
@@ -90,7 +98,11 @@ void FreeGPUResources() {
     }
     render_texture = NULL;
 
+#if IN_FLIGHT_FRAMES >= 1
     for (size_t i = 0; i < IN_FLIGHT_FRAMES; i++) {
+#else
+    for (size_t i = 0; i < 1; i++) {
+#endif
         if (gpu_device) {
             if (swapchain_textures[i].render_target) {
                 SDL_ReleaseGPUTexture(gpu_device, swapchain_textures[i].render_target);
@@ -141,7 +153,12 @@ static bool InitGPURenderTexture(void) {
     transfer_buffer_create_info.props = 0;
     transfer_buffer_create_info.size = LEScreenWidth * LEScreenHeight * 4;  /* 4 bytes for each pixel */
 
+/* smh */
+#if IN_FLIGHT_FRAMES >= 1
     for (size_t i = 0; i < IN_FLIGHT_FRAMES; i++) {
+#else
+    for (size_t i = 0; i < 1; i++) {
+#endif
         if (!(swapchain_textures[i].render_target = SDL_CreateGPUTexture(gpu_device, &gpu_texture_create_info))) {
             fprintf(stderr, "Failed to create GPU texture! (SDL Error: %s)\n", SDL_GetError());
             return false;
@@ -469,13 +486,16 @@ bool CopyFrameToRenderTexture(size_t frame) {
 }
 
 bool LEStartGPURender(void) {
+#if IN_FLIGHT_FRAMES >= 1
     active_frame = (active_frame + 1) % (IN_FLIGHT_FRAMES);
     
     if (swapchain_textures[active_frame].fence) {
         SDL_WaitForGPUFences(gpu_device, true, &swapchain_textures[active_frame].fence, 1);
         SDL_ReleaseGPUFence(gpu_device, swapchain_textures[active_frame].fence);
         swapchain_textures[active_frame].fence = NULL;
+        CopyFrameToRenderTexture(active_frame);
     }
+#endif
 
     static SDL_GPUColorTargetInfo color_target_info;
     color_target_info.clear_color = (SDL_FColor){0.f, 0.f, 0.f, 1.f};
@@ -546,9 +566,9 @@ bool LEFinishGPURendering(void) {
         return false;
     }
 
+#if IN_FLIGHT_FRAMES >= 1
     bool found = false;
     size_t latest_match;
-#if IN_FLIGHT_FRAMES > 1
     for (size_t i = (active_frame + 1) % (IN_FLIGHT_FRAMES); i != active_frame; i = (i + 1) % (IN_FLIGHT_FRAMES)) {
         /* if this frame was never rendered, skip. (only happens in the first few frames, then this should never happen.) */
         if (!swapchain_textures[i].fence) {
@@ -564,18 +584,16 @@ bool LEFinishGPURendering(void) {
         SDL_ReleaseGPUFence(gpu_device, swapchain_textures[i].fence);
         swapchain_textures[i].fence = NULL;
     }
-#else
-    found = true;
-    latest_match = active_frame;
-    SDL_WaitForGPUFences(gpu_device, true, &swapchain_textures[active_frame].fence, 1);
-    SDL_ReleaseGPUFence(gpu_device, swapchain_textures[active_frame].fence);
-    swapchain_textures[active_frame].fence = NULL;
-#endif
 
     if (found) {
         CopyFrameToRenderTexture(latest_match);
     }
-
+#else
+    SDL_WaitForGPUFences(gpu_device, true, &swapchain_textures[active_frame].fence, 1);
+    SDL_ReleaseGPUFence(gpu_device, swapchain_textures[active_frame].fence);
+    swapchain_textures[active_frame].fence = NULL;
+    CopyFrameToRenderTexture(active_frame);
+#endif
     if (!SDL_RenderTexture(renderer, render_texture, NULL, NULL)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to display GPU texture to screen! (SDL Error: '%s')\n", SDL_GetError());
         return false;
