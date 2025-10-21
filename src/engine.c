@@ -9,6 +9,7 @@
 #include <SDL3_image/SDL_image.h>
 #include <cglm/affine.h>
 #include <cglm/cam.h>
+#include <cglm/io.h>
 #include <cglm/mat4.h>
 #include <cglm/quat.h>
 #define TITLE "Lost In Transit"
@@ -703,11 +704,11 @@ static inline void StepAnimation(struct Model *pModel) {
                 glm_vec3_lerp(bone->scale_keys[key_idx - 1].value, bone->scale_keys[key_idx].value, (pModel->animation_time - last_timestamp) / (new_timestamp - last_timestamp), scale);
                 break;
             }
-            
+
             glm_mat4_identity(bone->local_transform);
-            glm_translate(bone->local_transform, position);
-            glm_quat_rotate(bone->local_transform, rotation, bone->local_transform);
             glm_scale(bone->local_transform, scale);
+            glm_quat_rotate(bone->local_transform, rotation, bone->local_transform);
+            glm_translate(bone->local_transform, position);
         }
     }
     
@@ -718,19 +719,14 @@ static inline void StepAnimation(struct Model *pModel) {
             continue;
         }
 
-        /* mesh->bone * bone->bone */
-        glm_mul(pModel->bones[bone_id].local_transform, pModel->bones[bone_id].offset_matrix, pModel->objects[obj_idx]._transformation);
-        /* mesh->bone * bone->mesh, result is a model matrix that does animation. */
-        glm_mul(pModel->bones[bone_id].offset_matrix_inv, pModel->objects[obj_idx]._transformation, pModel->objects[obj_idx]._transformation);
+        glm_mat4_copy(pModel->bones[bone_id].local_transform, pModel->objects[obj_idx]._transformation);
 
         /* if we have a parent, and the parent is also a bone, do this: */
         if (pModel->objects[obj_idx].parent && MLFindBoneByName(pModel, pModel->objects[obj_idx].parent->name) != (size_t)-1) {
-            /* mesh * mesh */
             glm_mul(pModel->objects[obj_idx].parent->_transformation, pModel->objects[obj_idx]._transformation, pModel->objects[obj_idx]._transformation);
         }
 
-        glm_mat4_copy(pModel->objects[obj_idx]._transformation, matrices.bone_matrices[bone_id]);
-        glm_mul(pModel->bones[bone_id].offset_matrix, matrices.bone_matrices[bone_id], matrices.bone_matrices[bone_id]);
+        glm_mul(pModel->objects[obj_idx]._transformation, pModel->bones[bone_id].offset_matrix, matrices.bone_matrices[bone_id]);
     }
 }
 

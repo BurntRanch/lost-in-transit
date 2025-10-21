@@ -21,7 +21,7 @@ void main() {
     mat4 bone_mat = mat4(0.0f);
     bool found_any = false;
     for (int i = 0; i < 4; i++) {
-        if (bone_ids[i] == -1) {
+        if (bone_ids[i] < 0) {
             continue;
         }
         found_any = true;
@@ -33,6 +33,6 @@ void main() {
 
     gl_Position = mats.projection * mats.view * mats.model * bone_mat * vec4(vert_pos, 1.0f);
     uv = vert_uv;
-    FragPos = vec3(mats.model * bone_mat * vec4(vert_pos, 1.0f));
+    FragPos = vec3(mats.model * vec4(vert_pos, 1.0f));
     Normal = vert_norm;
 }

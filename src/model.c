@@ -291,7 +291,7 @@ static inline bool LoadObject(const struct aiScene *pScene, struct Model *scene,
 
             aiMatrix4ToMat4(scene->bones[bone_id].offset_matrix, &bone->mOffsetMatrix);
             glm_mat4_inv(scene->bones[bone_id].offset_matrix, scene->bones[bone_id].offset_matrix_inv);
-            aiMatrix4ToMat4(scene->bones[bone_id].local_transform, &pNode->mTransformation);
+            glm_mat4_identity(scene->bones[bone_id].local_transform);
 
             for (size_t weight_idx = 0; weight_idx < mesh->mBones[bone_idx]->mNumWeights; weight_idx++) {
                 SDL_assert(bone->mWeights[weight_idx].mVertexId < mesh->mNumVertices);
